@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.19.0](https://github.com/Gyang91/ha-miele-at-lan/compare/v1.18.1...v1.19.0) (2026-11-09)
+
+
+### Features
+
+* **sensor:** Add energy and water consumption of the running program ([276cdca](https://github.com/Gyang91/ha-miele-at-lan/commit/276cdcab66c1ed8a4684c8b590f5c684ea4ed840))
+* **sensor:** Add lifetime energy and water consumption from DOP2 2/1585 ([68b8729](https://github.com/Gyang91/ha-miele-at-lan/commit/68b8729a256e1a3b398ec78eb880e26d2864691b))
+
 ## [1.18.1](https://github.com/Gyang91/ha-miele-at-lan/compare/v1.18.0...v1.18.1) (2026-11-09)
 
 
