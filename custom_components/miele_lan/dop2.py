@@ -246,6 +246,21 @@ def _decode_dos_container(c: dict[int, tuple[int, Any]]) -> dict[str, Any]:
     }
 
 
+def dos_container_field(ctx: dict[str, Any], idx: int, key: str) -> Any:
+    """One field of dosing container `idx` from a parsed device context.
+
+    None when the container is missing or not inserted: a value read from an
+    empty slot means nothing, so consumers report `unknown` instead.
+    """
+    containers = ctx.get("dos_containers")
+    if not containers or len(containers) <= idx:
+        return None
+    container = containers[idx]
+    if not container.get("bitmask_inserted"):
+        return None
+    return container.get(key)
+
+
 def parse_global_device_context(payload: bytes) -> dict[str, Any]:
     """DOP2 2/1585 — GLOBAL_DeviceContext.
 

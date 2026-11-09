@@ -21,11 +21,12 @@ from .const import (
     DOMAIN,
     DOORED_FAMILY,
     HOB_FAMILY,
-    LAUNDRY_FAMILY,
+    TWINDOS_FAMILY,
     WINE_FAMILY,
     MieleAppliance,
 )
 from .coordinator import MieleLanCoordinator, MieleLanData
+from .dop2 import dos_container_field
 from .entity import MieleLanEntity
 from .extended_state import hob_zone_count, parse_hob_extended_state
 
@@ -69,27 +70,23 @@ class MieleLanDeviceContextBinarySensorDef:
 
 DEVICE_CONTEXT_BINARY_SENSORS: tuple[MieleLanDeviceContextBinarySensorDef, ...] = (
     MieleLanDeviceContextBinarySensorDef(
-        types=LAUNDRY_FAMILY,
+        types=TWINDOS_FAMILY,
         description=MieleLanDeviceContextBinarySensorDescription(
             key="twindos_1_empty",
             translation_key="twindos_1_empty",
             entity_category=EntityCategory.DIAGNOSTIC,
             container_index=0,
-            is_on_fn=lambda ctx: (
-                (ctx.get("dos_containers") or [None])[0] or {}
-            ).get("bitmask_empty"),
+            is_on_fn=lambda ctx: dos_container_field(ctx, 0, "bitmask_empty"),
         ),
     ),
     MieleLanDeviceContextBinarySensorDef(
-        types=LAUNDRY_FAMILY,
+        types=TWINDOS_FAMILY,
         description=MieleLanDeviceContextBinarySensorDescription(
             key="twindos_2_empty",
             translation_key="twindos_2_empty",
             entity_category=EntityCategory.DIAGNOSTIC,
             container_index=1,
-            is_on_fn=lambda ctx: (
-                (ctx.get("dos_containers") or [None, None])[1] or {}
-            ).get("bitmask_empty"),
+            is_on_fn=lambda ctx: dos_container_field(ctx, 1, "bitmask_empty"),
         ),
     ),
 )

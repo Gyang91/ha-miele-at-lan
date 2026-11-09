@@ -42,6 +42,7 @@ from .const import (
     DOMAIN,
     HOB_FAMILY,
     LAUNDRY_FAMILY,
+    TWINDOS_FAMILY,
     OVEN_FAMILY,
     PROCESS_ACTION_PAUSE,
     PROCESS_ACTION_START,
@@ -52,6 +53,7 @@ from .const import (
     parse_minutes_field as _minutes,
 )
 from .coordinator import MieleLanCoordinator
+from .dop2 import dos_container_field
 from .entity import MieleLanEntity
 
 
@@ -830,18 +832,6 @@ _WASH2DRY_OPTIONS = [
 ]
 
 
-def _dos_container_value(
-    ctx: dict[str, Any], idx: int, key: str
-) -> Any:
-    containers = ctx.get("dos_containers")
-    if not containers or len(containers) <= idx:
-        return None
-    c = containers[idx]
-    if not c.get("bitmask_inserted"):
-        return None
-    return c.get(key)
-
-
 def _consumable_percent(ctx: dict[str, Any], key: str) -> Any:
     """Dishwasher salt / rinse-aid level from GLOBAL_DeviceAttributesDWTDWM.
 
@@ -856,47 +846,47 @@ def _consumable_percent(ctx: dict[str, Any], key: str) -> Any:
 
 DEVICE_CONTEXT_SENSORS: tuple[MieleLanDeviceContextSensorDef, ...] = (
     MieleLanDeviceContextSensorDef(
-        types=LAUNDRY_FAMILY,
+        types=TWINDOS_FAMILY,
         description=MieleLanDeviceContextSensorDescription(
             key="twindos_1_level",
             translation_key="twindos_1_level",
             native_unit_of_measurement="%",
             entity_category=EntityCategory.DIAGNOSTIC,
             container_index=0,
-            value_fn=lambda ctx: _dos_container_value(ctx, 0, "filling_level_pct"),
+            value_fn=lambda ctx: dos_container_field(ctx, 0, "filling_level_pct"),
         ),
     ),
     MieleLanDeviceContextSensorDef(
-        types=LAUNDRY_FAMILY,
+        types=TWINDOS_FAMILY,
         description=MieleLanDeviceContextSensorDescription(
             key="twindos_2_level",
             translation_key="twindos_2_level",
             native_unit_of_measurement="%",
             entity_category=EntityCategory.DIAGNOSTIC,
             container_index=1,
-            value_fn=lambda ctx: _dos_container_value(ctx, 1, "filling_level_pct"),
+            value_fn=lambda ctx: dos_container_field(ctx, 1, "filling_level_pct"),
         ),
     ),
     MieleLanDeviceContextSensorDef(
-        types=LAUNDRY_FAMILY,
+        types=TWINDOS_FAMILY,
         description=MieleLanDeviceContextSensorDescription(
             key="twindos_1_dosage",
             translation_key="twindos_1_dosage",
             native_unit_of_measurement="mL",
             entity_category=EntityCategory.DIAGNOSTIC,
             container_index=0,
-            value_fn=lambda ctx: _dos_container_value(ctx, 0, "current_dosage_ml"),
+            value_fn=lambda ctx: dos_container_field(ctx, 0, "current_dosage_ml"),
         ),
     ),
     MieleLanDeviceContextSensorDef(
-        types=LAUNDRY_FAMILY,
+        types=TWINDOS_FAMILY,
         description=MieleLanDeviceContextSensorDescription(
             key="twindos_2_dosage",
             translation_key="twindos_2_dosage",
             native_unit_of_measurement="mL",
             entity_category=EntityCategory.DIAGNOSTIC,
             container_index=1,
-            value_fn=lambda ctx: _dos_container_value(ctx, 1, "current_dosage_ml"),
+            value_fn=lambda ctx: dos_container_field(ctx, 1, "current_dosage_ml"),
         ),
     ),
     MieleLanDeviceContextSensorDef(
@@ -922,7 +912,7 @@ DEVICE_CONTEXT_SENSORS: tuple[MieleLanDeviceContextSensorDef, ...] = (
             native_unit_of_measurement="%",
             entity_category=EntityCategory.DIAGNOSTIC,
             container_index=0,
-            value_fn=lambda ctx: _dos_container_value(ctx, 0, "filling_level_pct"),
+            value_fn=lambda ctx: dos_container_field(ctx, 0, "filling_level_pct"),
         ),
     ),
     MieleLanDeviceContextSensorDef(

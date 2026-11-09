@@ -249,6 +249,16 @@ LAUNDRY_FAMILY: tuple[MieleAppliance, ...] = (
     MieleAppliance.WASHER_DRYER,
 )
 
+# Washers with the TwinDos detergent system. Tumble dryers are left out on
+# purpose: they report a dosing-container slot in DOP2 2/1585 too, but have
+# no TwinDos, so TwinDos entities on a dryer only ever showed `unknown`.
+TWINDOS_FAMILY: tuple[MieleAppliance, ...] = (
+    MieleAppliance.WASHING_MACHINE,
+    MieleAppliance.WASHING_MACHINE_SEMI_PROFESSIONAL,
+    MieleAppliance.WASHING_MACHINE_PROFESSIONAL,
+    MieleAppliance.WASHER_DRYER,
+)
+
 DISHWASHER_FAMILY: tuple[MieleAppliance, ...] = (
     MieleAppliance.DISHWASHER,
     MieleAppliance.DISHWASHER_SEMI_PROFESSIONAL,
