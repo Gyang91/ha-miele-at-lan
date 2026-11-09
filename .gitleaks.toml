@@ -1,0 +1,10 @@
+# Gitleaks: default rules, plus one allowlist for Home Assistant entity
+# descriptions. `key="twindos_1_empty"` and `translation_key="..."` name an
+# entity, they are not secrets, but the generic-api-key rule flags them.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Home Assistant entity description keys"
+regexTarget = "match"
+regexes = ['''(?:translation_)?key="[a-z0-9_]+"''']
