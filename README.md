@@ -20,12 +20,13 @@
 
 # Miele@LAN
 
-> **Fork note.** This is a fork of [tiehfood/ha-miele-at-lan](https://github.com/tiehfood/ha-miele-at-lan)
-> with one fix: background polling no longer wakes washers, dryers and dishwashers
+> **Fork note.** This is a fork of [tiehfood/ha-miele-at-lan](https://github.com/tiehfood/ha-miele-at-lan).
+> Its main fix: background polling no longer wakes washers, dryers and dishwashers
 > (`PUT /State {"DeviceAction": 2}` every 10 minutes kept them out of standby, e.g. a
 > dryer's drum light switching on at night). The domain stays `miele_lan`, so it
-> replaces the original in place. Versions carry a `-fork.N` suffix; see
-> [CHANGELOG.md](CHANGELOG.md) and [Fork changes](#fork-changes).
+> replaces the original in place. Version numbers are this fork's own: install it
+> from `Gyang91/ha-miele-at-lan` in HACS. See [CHANGELOG.md](CHANGELOG.md) and
+> [Fork changes](#fork-changes).
 
 Local Home Assistant integration for Miele@home appliances — ovens, hobs, dishwashers, washers, dryers, fridges, freezers, hoods, coffee systems, dish warmers, wine cabinets. Talks directly to the appliance over the LAN. No cloud account is required to run, no sidecar server, no Miele 3rd-party API.
 
