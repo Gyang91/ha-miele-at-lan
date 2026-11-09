@@ -966,6 +966,32 @@ DEVICE_CONTEXT_SENSORS: tuple[MieleLanDeviceContextSensorDef, ...] = (
             value_fn=lambda ctx: _consumable_percent(ctx, "rinse_aid_percent"),
         ),
     ),
+    # Consumption of the running programme. It restarts with each programme,
+    # which total_increasing treats as a new cycle.
+    MieleLanDeviceContextSensorDef(
+        types=(*LAUNDRY_FAMILY, *DISHWASHER_FAMILY),
+        description=MieleLanDeviceContextSensorDescription(
+            key="program_energy",
+            translation_key="program_energy",
+            device_class=SensorDeviceClass.ENERGY,
+            state_class=SensorStateClass.TOTAL_INCREASING,
+            native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+            required_key="program_energy_wh",
+            value_fn=lambda ctx: ctx.get("program_energy_wh"),
+        ),
+    ),
+    MieleLanDeviceContextSensorDef(
+        types=(*LAUNDRY_FAMILY, *DISHWASHER_FAMILY),
+        description=MieleLanDeviceContextSensorDescription(
+            key="program_water",
+            translation_key="program_water",
+            device_class=SensorDeviceClass.WATER,
+            state_class=SensorStateClass.TOTAL_INCREASING,
+            native_unit_of_measurement=UnitOfVolume.LITERS,
+            required_key="program_water_l",
+            value_fn=lambda ctx: ctx.get("program_water_l"),
+        ),
+    ),
     # Lifetime totals the appliance keeps itself (Energy dashboard ready).
     MieleLanDeviceContextSensorDef(
         types=(*LAUNDRY_FAMILY, *DISHWASHER_FAMILY),

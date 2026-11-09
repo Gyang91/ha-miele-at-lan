@@ -261,13 +261,17 @@ def dos_container_field(ctx: dict[str, Any], idx: int, key: str) -> Any:
     return container.get(key)
 
 
-def _lifetime_counter(attrs: dict | None, key: int) -> int | None:
-    """Accumulated total kept in GLOBAL_DeviceAttributesDWTDWM attribute `key`.
+def _consumption_counter(attrs: dict | None, key: int) -> int | None:
+    """A consumption counter kept in GLOBAL_DeviceAttributesDWTDWM attribute `key`.
 
-    Attributes 5 (energy, Wh) and 6 (water, litres) are structs: field 1 says
-    whether the appliance keeps this counter (0 = not kept) and field 4 holds
-    the total. Verified on a G7655 dishwasher against the Miele app (upstream
-    PR #63) and on an EK037 tumble dryer, which keeps energy but not water.
+    Attributes 3/4 (current programme energy Wh / water L) and 5/6 (lifetime
+    energy Wh / water L) are structs: field 1 says whether the appliance keeps
+    the counter (0 = not kept) and field 4 holds the value.
+
+    Verified: lifetime totals of a G7655 dishwasher match the Miele app
+    (upstream PR #63). On an EK037 tumble dryer, attribute 5 and attribute 3
+    both rose by the same 53 Wh during one drying run, and both water
+    counters are not kept.
     """
     if not attrs:
         return None
@@ -340,8 +344,10 @@ def parse_global_device_context(payload: bytes) -> dict[str, Any]:
             device_attributes.get(9, (None, None))[1]
             if device_attributes else None
         ),
-        "lifetime_energy_wh": _lifetime_counter(device_attributes, 5),
-        "lifetime_water_l": _lifetime_counter(device_attributes, 6),
+        "program_energy_wh": _consumption_counter(device_attributes, 3),
+        "program_water_l": _consumption_counter(device_attributes, 4),
+        "lifetime_energy_wh": _consumption_counter(device_attributes, 5),
+        "lifetime_water_l": _consumption_counter(device_attributes, 6),
         # GLOBAL_EnumDoorState: 0 unknown, 1 open, 2 closed, 3 locked,
         # 4 drying plus. Follows the door on a G7197 whose SignalDoor
         # never changes (issue #59).
