@@ -227,6 +227,8 @@ alone wakes an appliance is not known.
   the appliance is idle.
 - **Smart Grid** binary sensor, from the second element of
   `/State.RemoteEnable`.
+- **Power switch for tumble dryers** (tested on an EK037 module): the DOP2
+  2/1586 write switches them off within a second, waking switches them on.
 
 Not possible over the LAN on every appliance:
 
@@ -236,8 +238,8 @@ Not possible over the LAN on every appliance:
 - No power switch for washers. Tested on a WWI860 with an EK057 module: it
   rejects every DOP2 write (404); over `/State` it accepts
   `{"DeviceAction": 2}` but stays off, and answers `{"DeviceAction": 3}`
-  (go to standby) with HTTP 400. Whether dryers with an EK037 module accept
-  the power write (DOP2 2/1586) is untested.
+  (go to standby) with HTTP 400. Its WiFi module lists no DOP2 resource at
+  all, and reports no newer firmware.
 
 ### Security
 

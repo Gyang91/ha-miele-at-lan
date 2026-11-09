@@ -340,11 +340,16 @@ HAS_LIGHT_STATE: tuple[MieleAppliance, ...] = LIGHTABLE_FAMILY
 
 # Power switch — devices that can be switched on/off remotely (panel power),
 # not the same as Start/Stop of a program (which is heat-gated).
+# Tumble dryer: verified on an EK037 module (FW 04.05): the DOP2 2/1586 write
+# switches it off within a second, and waking it switches it on. Washers are
+# left out: an EK057 washer has no DOP2 at all, ignores DeviceAction 2 and
+# refuses DeviceAction 3 (HTTP 400).
 POWERABLE_FAMILY: tuple[MieleAppliance, ...] = (
     *OVEN_FAMILY, *DISHWASHER_FAMILY,
     MieleAppliance.DISH_WARMER,
     MieleAppliance.COFFEE_SYSTEM,
     MieleAppliance.HOOD,
+    MieleAppliance.TUMBLE_DRYER,
 )
 
 

@@ -1,6 +1,6 @@
 """Miele@LAN switches — per-device-type filtered.
 
-* **Power** (oven-family / dishwasher / coffee-system / etc.) maps
+* **Power** (oven-family / dishwasher / tumble dryer / coffee-system / etc.) maps
   `Status != 1 (Off)` ↔ `MieleLanClient.set_power`, which writes DOP2 leaf
   2/1586 (appliance state) the way the official app does, falling back to
   the GLOBAL_USER_REQ SWITCH_ON / SWITCH_OFF opcodes. Dop1-capable hoods
