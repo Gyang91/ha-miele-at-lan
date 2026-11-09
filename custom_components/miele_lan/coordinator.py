@@ -695,7 +695,14 @@ class MieleLanCoordinator(DataUpdateCoordinator[MieleLanData]):
         if merged:
             self._push_count += 1
             self._last_push_at = time.time()
-            self.async_set_updated_data(self._data)
+            # Not async_set_updated_data(): that also restarts the poll timer.
+            # A running appliance pushes about every 30 s, so it was then never
+            # polled for the whole programme, and everything only the poll
+            # reads (DOP2 2/1585, WLAN, hours of operation) went stale. The
+            # slow poll is meant to keep running next to push (polling.py).
+            self.data = self._data
+            self.last_update_success = True
+            self.async_update_listeners()
 
     async def _fetch_full_ident(self) -> dict[str, Any]:
         """Read raw /Devices/{fab}/Ident and extract appliance + XKM fields."""
