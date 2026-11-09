@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.18.1](https://github.com/Gyang91/ha-miele-at-lan/compare/v1.18.0...v1.18.1) (2026-11-09)
+
+
+### Bug Fixes
+
+* **coordinator:** Keep polling while an appliance pushes ([99bf9ae](https://github.com/Gyang91/ha-miele-at-lan/commit/99bf9ae0bd26989ab993558a850d6dd3e5d0d13f))
+* **sensor:** Add 2/1585 entities once the appliance first answers ([c872088](https://github.com/Gyang91/ha-miele-at-lan/commit/c87208899f7c26e00f83ab7769d2c5100fbf3930))
+
 ## [1.18.0](https://github.com/Gyang91/ha-miele-at-lan/compare/v1.17.1-fork.1...v1.18.0) (2026-11-09)
 
 
