@@ -54,7 +54,7 @@ from .const import (
 from .coordinator import MieleLanCoordinator
 from .dop2 import dos_container_field
 from .program_times import program_timestamps, stabilise
-from .entity import MieleLanEntity
+from .entity import MieleLanEntity, add_entities_when_ready
 from .runtime import MieleLanConfigEntry
 
 
@@ -1118,20 +1118,30 @@ async def async_setup_entry(
             if rdk is not None and rdk not in coord.data.dop2:
                 continue
             entities.append(MieleLanDop2Sensor(coord, d.description))
-        for d in DEVICE_CONTEXT_SENSORS:
-            if dt not in d.types:
-                continue
-            if not coord.data.device_context:
-                continue
-            ci = d.description.container_index
-            if ci is not None:
-                containers = coord.data.device_context.get("dos_containers")
-                if not containers or len(containers) <= ci:
-                    continue
-            entities.append(MieleLanDeviceContextSensor(coord, d.description))
+        if any(dt in d.types for d in DEVICE_CONTEXT_SENSORS):
+            add_entities_when_ready(
+                entry, coord, _device_context_sensors, async_add_entities
+            )
         # Diagnostic push-mode sensor — applies to every appliance.
         entities.append(MieleLanPushStateSensor(coord))
     async_add_entities(entities)
+
+
+def _device_context_sensors(coord: MieleLanCoordinator) -> list[SensorEntity]:
+    """Sensors fed by DOP2 2/1585, for what the leaf has reported so far."""
+    ctx = coord.data.device_context if coord.data else {}
+    if not ctx:
+        return []
+    containers = ctx.get("dos_containers") or []
+    entities: list[SensorEntity] = []
+    for d in DEVICE_CONTEXT_SENSORS:
+        if coord.device_type not in d.types:
+            continue
+        ci = d.description.container_index
+        if ci is not None and len(containers) <= ci:
+            continue
+        entities.append(MieleLanDeviceContextSensor(coord, d.description))
+    return entities
 
 
 # --- entity classes ----------------------------------------------------------

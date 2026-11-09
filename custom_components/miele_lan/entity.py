@@ -2,11 +2,54 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DEFAULT_NAME, DOMAIN, MieleAppliance
 from .coordinator import MieleLanCoordinator
+
+
+def add_entities_when_ready(
+    entry: ConfigEntry,
+    coordinator: MieleLanCoordinator,
+    build: Callable[[MieleLanCoordinator], Sequence[Entity]],
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Add data-dependent entities now, or once the data first arrives.
+
+    Which DOP2 2/1585 entities exist depends on what the leaf reports (for
+    example how many dosing containers). An appliance asleep when Home
+    Assistant starts has not answered yet; instead of waking it, wait for
+    its first answer and add the entities then, exactly once.
+    """
+    entities = build(coordinator)
+    if entities:
+        async_add_entities(entities)
+        return
+    listening = True
+
+    @callback
+    def _stop_listening() -> None:
+        nonlocal listening
+        if listening:
+            listening = False
+            remove_listener()
+
+    @callback
+    def _on_update() -> None:
+        late = build(coordinator)
+        if late:
+            _stop_listening()
+            async_add_entities(late)
+
+    remove_listener = coordinator.async_add_listener(_on_update)
+    entry.async_on_unload(_stop_listening)
 
 
 # Human-readable model labels per device type. Used as DeviceInfo.model so

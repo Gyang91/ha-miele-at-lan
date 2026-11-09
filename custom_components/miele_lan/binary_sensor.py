@@ -25,7 +25,7 @@ from .const import (
 )
 from .coordinator import MieleLanCoordinator, MieleLanData
 from .dop2 import dos_container_field
-from .entity import MieleLanEntity
+from .entity import MieleLanEntity, add_entities_when_ready
 from .runtime import MieleLanConfigEntry
 from .extended_state import hob_zone_count, parse_hob_extended_state
 
@@ -284,15 +284,24 @@ async def async_setup_entry(
                 if int(key.rsplit("_", 1)[1]) not in door_zones:
                     continue
             entities.append(MieleLanBinarySensor(coord, d.description))
-        for d in DEVICE_CONTEXT_BINARY_SENSORS:
-            if dt not in d.types:
-                continue
-            ci = d.description.container_index
-            containers = coord.data.device_context.get("dos_containers") if coord.data else None
-            if not containers or len(containers) <= ci:
-                continue
-            entities.append(MieleLanDeviceContextBinarySensor(coord, d.description))
+        if any(dt in d.types for d in DEVICE_CONTEXT_BINARY_SENSORS):
+            add_entities_when_ready(
+                entry, coord, _device_context_binary_sensors, async_add_entities
+            )
     async_add_entities(entities)
+
+
+def _device_context_binary_sensors(
+    coord: MieleLanCoordinator,
+) -> list[BinarySensorEntity]:
+    """Binary sensors fed by DOP2 2/1585, for what the leaf has reported so far."""
+    ctx = coord.data.device_context if coord.data else {}
+    containers = ctx.get("dos_containers") or []
+    return [
+        MieleLanDeviceContextBinarySensor(coord, d.description)
+        for d in DEVICE_CONTEXT_BINARY_SENSORS
+        if coord.device_type in d.types and len(containers) > d.description.container_index
+    ]
 
 
 class MieleLanBinarySensor(MieleLanEntity, BinarySensorEntity):
