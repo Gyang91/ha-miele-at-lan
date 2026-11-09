@@ -233,9 +233,11 @@ Not possible over the LAN on every appliance:
 - Energy and water consumption need either `/State.ExtendedState` (only a
   few models send it) or DOP2 reads. Washers with an EK057 WiFi module
   answer every DOP2 read with 404 and send no `ExtendedState`.
-- No power switch for washers and dryers yet. Washers with an EK057 module
-  reject every DOP2 write (404), so it cannot work there. Whether dryers
-  with an EK037 module accept the power write (DOP2 2/1586) is untested.
+- No power switch for washers. Tested on a WWI860 with an EK057 module: it
+  rejects every DOP2 write (404); over `/State` it accepts
+  `{"DeviceAction": 2}` but stays off, and answers `{"DeviceAction": 3}`
+  (go to standby) with HTTP 400. Whether dryers with an EK037 module accept
+  the power write (DOP2 2/1586) is untested.
 
 ### Security
 
