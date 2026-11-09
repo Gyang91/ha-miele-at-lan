@@ -50,10 +50,18 @@ WLAN_REFRESH_INTERVAL = 300  # seconds — RSSI/signal-percentage drift slowly;
 DEVICE_CONTEXT_REFRESH_INTERVAL = 600  # seconds — TwinDos fill level and wash2dry
                                        # state evolve on a per-cycle timescale.
 DEVICE_CONTEXT_MAX_MISS_CYCLES = 3  # consecutive poll cycles allowed to end
-                                    # without a 200 (500 after wake, or a
-                                    # fetch failure) before the leaf is
-                                    # latched unsupported — see
+                                    # without a 200 (a 500 or a fetch failure
+                                    # while a programme runs) before the leaf
+                                    # is latched unsupported — see
                                     # _maybe_refresh_device_context.
+# /State.Status values where the appliance is switched off or unreachable.
+# Background reads of 2/1585 are skipped entirely in these states, so a
+# sleeping appliance is left alone instead of being polled every 10 minutes.
+DEVICE_CONTEXT_SKIP_STATUSES = {1, 255}  # off, not_connected
+# /State.Status values where the XKM is known to be awake (a programme is
+# running), so a 500 is a real answer and counts towards the latch. Delayed
+# start (4) is left out on purpose: the XKM may sleep through the delay.
+DEVICE_CONTEXT_AWAKE_STATUSES = {5}  # in_use
 HOOD_FILTER_REFRESH_INTERVAL = 3600  # seconds — grease/charcoal filter saturation
                                      # creeps up over weeks, so hourly is ample.
 IDENT_MAX_ATTEMPTS = 5  # /Ident is fetched once; these are the retries allowed
@@ -439,11 +447,21 @@ class MieleLanCoordinator(DataUpdateCoordinator[MieleLanData]):
           does not *mean* asleep: other EK037-class units (issue #16,
           FW 04.05) answer 500 {"Error": 20660} or 28701 on unrelated
           leaves while awake, every time — and time out on 2/1585.
-          So the 500-path is transient (one wake-and-retry round per
-          poll cycle) but *bounded*: if 3 consecutive poll cycles end
-          without a 200 (500 after wake, or a fetch failure/timeout),
-          the leaf is latched unsupported just like a 403/404. Any 200
-          resets the counter.
+
+        This is a background read, so it **never wakes** the appliance:
+        `PUT /State {"DeviceAction": 2}` switches on parts of the machine
+        (e.g. the drum light of a dryer) and, sent every 10 minutes, kept
+        appliances from ever reaching standby. Waking stays reserved for
+        user actions (wake button, power switch).
+
+        - While `/State.Status` is off or not_connected the read is
+          skipped entirely; the throttle is not advanced, so the read
+          happens on the first poll after the appliance comes back on.
+        - Unless a programme is running (Status in_use), a 500 or a fetch
+          failure means "asleep": keep the last value, count no miss.
+        - While a programme runs the XKM is awake, so a 500 or a fetch
+          failure is a miss. 3 consecutive misses latch the leaf
+          unsupported just like a 403/404. Any 200 resets the counter.
         - A latch (403/404, or 3 misses) also clears the cached
           device_context so device-context consumers see empty data
           (entities go `unknown`) instead of frozen stale levels.
@@ -453,6 +471,7 @@ class MieleLanCoordinator(DataUpdateCoordinator[MieleLanData]):
             return
         if self.device_type not in (*LAUNDRY_FAMILY, *DISHWASHER_FAMILY):
             return
+        status = self._data.state.get("Status")
         now = time.monotonic()
         if now - self._device_context_last_fetch < DEVICE_CONTEXT_REFRESH_INTERVAL:
             # The door needs poll cadence, not the 10-minute one (#59). Only
@@ -462,7 +481,10 @@ class MieleLanCoordinator(DataUpdateCoordinator[MieleLanData]):
             if self._device_context_answered and self.device_type in DISHWASHER_FAMILY:
                 await self._quick_refresh_device_context()
             return
+        if status in DEVICE_CONTEXT_SKIP_STATUSES:
+            return
         self._device_context_last_fetch = now
+        programme_active = status in DEVICE_CONTEXT_AWAKE_STATUSES
 
         def _miss(context: str) -> None:
             """Count a cycle that ended without a 200 and latch at the bound."""
@@ -490,25 +512,14 @@ class MieleLanCoordinator(DataUpdateCoordinator[MieleLanData]):
                 f"/Devices/{self.fab}/DOP2/2/1585?idx1=0&idx2=0",
                 allowed_status=(200, 403, 404, 500),
             )
-            if st == 500:
-                # Sleeping XKM — wake it, give it the same ~3s the app
-                # allows, and retry once before the next poll cycle.
-                try:
-                    await self.client.wake()
-                except Exception as err:  # noqa: BLE001
-                    _LOGGER.debug(
-                        "[%s] DOP2 2/1585 got 500 (asleep), wake failed: %s",
-                        self.fab, err,
-                    )
-                    _miss("500, wake failed")
-                    return
-                await asyncio.sleep(3)
-                st, body = await self.client.raw._request_bytes(
-                    "GET",
-                    f"/Devices/{self.fab}/DOP2/2/1585?idx1=0&idx2=0",
-                    allowed_status=(200, 403, 404, 500),
-                )
         except Exception as err:  # noqa: BLE001
+            if not programme_active:
+                _LOGGER.debug(
+                    "[%s] DOP2 2/1585 fetch failed while idle (%s) — "
+                    "treating as asleep, keeping last value",
+                    self.fab, type(err).__name__,
+                )
+                return
             _LOGGER.debug("[%s] DOP2 2/1585 fetch failed: %s", self.fab, err)
             _miss(f"fetch failed ({type(err).__name__})")
             return
@@ -522,14 +533,23 @@ class MieleLanCoordinator(DataUpdateCoordinator[MieleLanData]):
             )
             return
         if st != 200:
-            # Still 500 after the wake-and-retry (or a 500 from a unit that
-            # answers 500 while awake). Transient but bounded: after
-            # DEVICE_CONTEXT_MAX_MISS_CYCLES consecutive misses the leaf is
-            # latched unsupported so we stop waking a machine that won't
-            # cooperate (review note on #16/G7310: FW 04.05 answers 500 on
-            # unrelated DOP2 reads every time while awake, and 2/1585 times
-            # out — this bound keeps that from blocking the connection).
-            _miss(f"HTTP {st} after wake")
+            if not programme_active:
+                # No programme running: the XKM is most likely asleep
+                # (G7655 answers 500 to every DOP2 read then). Not a sign
+                # of an unsupported leaf, so no miss and no latch.
+                _LOGGER.debug(
+                    "[%s] DOP2 2/1585 returned %d while idle — treating as "
+                    "asleep, keeping last value",
+                    self.fab, st,
+                )
+                return
+            # A 500 while a programme runs comes from an awake XKM.
+            # Transient but bounded: after DEVICE_CONTEXT_MAX_MISS_CYCLES
+            # consecutive misses the leaf is latched unsupported (review
+            # note on #16/G7310: FW 04.05 answers 500 on unrelated DOP2
+            # reads every time while awake, and 2/1585 times out — this
+            # bound keeps that from blocking the connection).
+            _miss(f"HTTP {st} while programme active")
             return
         self._device_context_miss_cycles = 0
         self._store_device_context(body)

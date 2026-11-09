@@ -137,10 +137,11 @@ async def test_door_state_is_dropped_when_this_poll_could_not_read_it(make_coord
 @pytest.mark.asyncio
 async def test_no_quick_read_before_the_leaf_ever_answered(make_coordinator, clock):
     # A leaf that times out (EK037 FW 04.05) must not cost a stall every poll.
-    coord = make_coordinator(MieleAppliance.DISHWASHER, [(500, b""), (500, b"")])
+    coord = make_coordinator(MieleAppliance.DISHWASHER, [(500, b"")])
     await coord._maybe_refresh_device_context()
     calls = coord.client.raw.calls
-    assert calls == 2  # full read: 500, wake, 500
+    assert calls == 1  # full read: 500, no wake, no retry
+    coord.client.wake.assert_not_awaited()
 
     clock["t"] += 60
     await coord._maybe_refresh_device_context()
@@ -165,7 +166,12 @@ async def test_full_read_still_runs_on_the_slow_cadence(make_coordinator, clock)
     )
     await coord._maybe_refresh_device_context()
 
-    clock["t"] += DEVICE_CONTEXT_REFRESH_INTERVAL  # due: wake and retry path
+    clock["t"] += DEVICE_CONTEXT_REFRESH_INTERVAL  # due: asleep, no wake
     await coord._maybe_refresh_device_context()
-    coord.client.wake.assert_awaited_once()
+    assert coord._data.door_state is None
+    assert coord._device_context_miss_cycles == 0
+
+    clock["t"] += DEVICE_CONTEXT_REFRESH_INTERVAL  # due again: awake now
+    await coord._maybe_refresh_device_context()
+    coord.client.wake.assert_not_awaited()
     assert coord._data.door_state == 1
