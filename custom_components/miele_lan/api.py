@@ -18,9 +18,11 @@ from __future__ import annotations
 
 import asyncio
 import binascii
+import contextlib
 import json
 import logging
 import struct
+from collections.abc import Iterator
 from typing import Any
 
 import aiohttp
@@ -59,8 +61,6 @@ from .const import (
     DOP1_SWITCHLIGHT_OBJECT_ID,
     DOP1_SWITCHLIGHT_STRUKTUR_VERSION,
     LAUNDRY_FAMILY,
-    OPCODE_LIGHT_OFF,
-    OPCODE_LIGHT_ON,
     OPCODE_SWITCH_OFF,
     OPCODE_SWITCH_ON,
     PROCESS_ACTION_PAUSE,
@@ -397,7 +397,7 @@ async def _patched_request_bytes(
     session = await self._get_session()
 
     try:
-        async with session.request(
+        async with _request_lock(self), session.request(
             method, url, data=data_to_send, headers=headers, timeout=self.timeout
         ) as resp:
             raw = await resp.read()
@@ -419,8 +419,43 @@ async def _patched_request_bytes(
             return status, _crypto.decrypt_response(raw, sig_bytes, self.group_key)
     except asyncio.TimeoutError as exc:
         raise NetworkTimeoutError(str(exc)) from exc
-    except aiohttp.ClientConnectorError as exc:
-        raise NetworkConnectionError(str(exc)) from exc
+    except aiohttp.ClientError as exc:
+        # Not only refused connections: the XKM also drops idle keep-alive
+        # connections (ServerDisconnectedError, ClientOSError). Callers map
+        # NetworkConnectionError to a readable error; a raw aiohttp error
+        # reached the user as "Unknown error".
+        raise NetworkConnectionError(f"{type(exc).__name__}: {exc}") from exc
+
+
+def _request_lock(client: MieleClient) -> asyncio.Lock:
+    """One lock per appliance, so its requests run one at a time.
+
+    The appliance's WiFi module (XKM) is a small embedded web server. A poll,
+    a push-triggered refresh and a button press can otherwise hit it at the
+    same moment. The lock lives on the client instance, which is one per
+    appliance host.
+    """
+    lock = client.__dict__.get("_miele_lan_request_lock")
+    if lock is None:
+        lock = client.__dict__["_miele_lan_request_lock"] = asyncio.Lock()
+    return lock
+
+
+@contextlib.contextmanager
+def _command_transport_errors() -> Iterator[None]:
+    """Turn transport failures of a user command into readable errors.
+
+    HTTP status handling stays with each command, since what a status means
+    differs per endpoint.
+    """
+    try:
+        yield
+    except NetworkTimeoutError as exc:
+        raise HomeAssistantError(
+            "The appliance did not respond to the command (timeout)."
+        ) from exc
+    except NetworkConnectionError as exc:
+        raise HomeAssistantError("Could not connect to the appliance.") from exc
 
 
 def _install_patches() -> None:
@@ -506,24 +541,21 @@ class MieleLanClient:
         The device rejects no-op writes (writing the current value) with HTTP 400.
         We treat that as success — the caller's intent is satisfied.
         """
-        try:
-            status, raw = await self._client._request_bytes(
-                "PUT",
-                f"/Devices/{self._route}/State",
-                body=body,
-                allowed_status=(200, 204),
-            )
-        except ResponseError as e:
-            if "HTTP error 400" in str(e):
-                _LOGGER.debug("/State write %r returned 400 (likely no-op)", body)
-                return {}
-            raise
-        except NetworkTimeoutError as exc:
-            raise HomeAssistantError(
-                "The appliance did not respond to the command (timeout)."
-            ) from exc
-        except NetworkConnectionError as exc:
-            raise HomeAssistantError("Could not connect to the appliance.") from exc
+        with _command_transport_errors():
+            try:
+                status, raw = await self._client._request_bytes(
+                    "PUT",
+                    f"/Devices/{self._route}/State",
+                    body=body,
+                    allowed_status=(200, 204),
+                )
+            except ResponseError as exc:
+                if exc.status_code == 400:
+                    _LOGGER.debug("/State write %r returned 400 (likely no-op)", body)
+                    return {}
+                raise HomeAssistantError(
+                    f"The appliance refused this command (HTTP {exc.status_code})."
+                ) from exc
         if status == 204 or not raw:
             return {}
         text = raw.decode("utf-8", errors="replace").strip()
@@ -577,23 +609,18 @@ class MieleLanClient:
             reason = check_process_action_precondition(precondition_state, action, device_type)
             if reason:
                 raise HomeAssistantError(reason)
-        try:
-            await self._client._request_bytes(
-                "PUT",
-                f"/Devices/{self._route}/State",
-                body={"ProcessAction": action},
-                allowed_status=(200, 204),
-            )
-        except ResponseError as exc:
-            raise HomeAssistantError(
-                f"The appliance refused this command (HTTP {exc.status_code})."
-            ) from exc
-        except NetworkTimeoutError as exc:
-            raise HomeAssistantError(
-                "The appliance did not respond to the command (timeout)."
-            ) from exc
-        except NetworkConnectionError as exc:
-            raise HomeAssistantError("Could not connect to the appliance.") from exc
+        with _command_transport_errors():
+            try:
+                await self._client._request_bytes(
+                    "PUT",
+                    f"/Devices/{self._route}/State",
+                    body={"ProcessAction": action},
+                    allowed_status=(200, 204),
+                )
+            except ResponseError as exc:
+                raise HomeAssistantError(
+                    f"The appliance refused this command (HTTP {exc.status_code})."
+                ) from exc
 
     async def start_process(
         self,
@@ -657,37 +684,32 @@ class MieleLanClient:
             f"/Devices/{self._route}/DOP2/"
             f"{USER_REQUEST_UNIT}/{USER_REQUEST_LEAF}?idx1=0&idx2=0"
         )
-        try:
-            await self._client._request_bytes(
-                "PUT", resource, body=payload, allowed_status=(200, 204)
-            )
-        except ResponseError as exc:
-            status = exc.status_code
-            if status == 404:
+        with _command_transport_errors():
+            try:
+                await self._client._request_bytes(
+                    "PUT", resource, body=payload, allowed_status=(200, 204)
+                )
+            except ResponseError as exc:
+                status = exc.status_code
+                if status == 404:
+                    raise HomeAssistantError(
+                        "This appliance's firmware does not accept remote commands "
+                        "over the local API (DOP2 writes are blocked on this hardware/firmware)."
+                    ) from exc
+                if status == 403:
+                    raise HomeAssistantError(
+                        "Remote control was refused. Enable 'Remote control' / "
+                        "'Mobile controllable' in the appliance's settings menu and try again."
+                    ) from exc
+                if status == 500:
+                    raise HomeAssistantError(
+                        "The appliance rejected the command (HTTP 500). This can happen "
+                        "if it isn't in a state that accepts it right now, or if this "
+                        "model doesn't support this command over the local API."
+                    ) from exc
                 raise HomeAssistantError(
-                    "This appliance's firmware does not accept remote commands "
-                    "over the local API (DOP2 writes are blocked on this hardware/firmware)."
+                    f"Remote command failed (HTTP {status})."
                 ) from exc
-            if status == 403:
-                raise HomeAssistantError(
-                    "Remote control was refused. Enable 'Remote control' / "
-                    "'Mobile controllable' in the appliance's settings menu and try again."
-                ) from exc
-            if status == 500:
-                raise HomeAssistantError(
-                    "The appliance rejected the command (HTTP 500). This can happen "
-                    "if it isn't in a state that accepts it right now, or if this "
-                    "model doesn't support this command over the local API."
-                ) from exc
-            raise HomeAssistantError(
-                f"Remote command failed (HTTP {status})."
-            ) from exc
-        except NetworkTimeoutError as exc:
-            raise HomeAssistantError(
-                "The appliance did not respond to the command (timeout)."
-            ) from exc
-        except NetworkConnectionError as exc:
-            raise HomeAssistantError("Could not connect to the appliance.") from exc
 
     # --- light / power convenience ------------------------------------------
 
@@ -832,27 +854,22 @@ class MieleLanClient:
         current fan level shouldn't surface as an error, so treat it as
         success with an empty body.
         """
-        try:
-            _, raw = await self._client._request_bytes(
-                "POST",
-                f"/Devices/{self._route}/DOP/",
-                body={"Request": request},
-                allowed_status=(200, 204),
-            )
-            return raw or b""
-        except ResponseError as exc:
-            if exc.status_code == 400:
-                _LOGGER.debug("%s: Dop1 %r returned 400 (likely no-op)", what, request)
-                return b""
-            raise HomeAssistantError(
-                f"{what} failed (HTTP {exc.status_code})."
-            ) from exc
-        except NetworkTimeoutError as exc:
-            raise HomeAssistantError(
-                "The appliance did not respond to the command (timeout)."
-            ) from exc
-        except NetworkConnectionError as exc:
-            raise HomeAssistantError("Could not connect to the appliance.") from exc
+        with _command_transport_errors():
+            try:
+                _, raw = await self._client._request_bytes(
+                    "POST",
+                    f"/Devices/{self._route}/DOP/",
+                    body={"Request": request},
+                    allowed_status=(200, 204),
+                )
+                return raw or b""
+            except ResponseError as exc:
+                if exc.status_code == 400:
+                    _LOGGER.debug("%s: Dop1 %r returned 400 (likely no-op)", what, request)
+                    return b""
+                raise HomeAssistantError(
+                    f"{what} failed (HTTP {exc.status_code})."
+                ) from exc
 
     async def set_fan_level(self, level: int) -> None:
         """Set the hood's ventilation level (0 = off, 1-3, 4 = boost).
