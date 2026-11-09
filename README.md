@@ -112,6 +112,56 @@ The login ends with a `miele://oauth2-code/?code=…&state=…` redirect that br
 
 Firefox: DevTools → Network → the blocked `miele://` redirect.
 
+## How to
+
+Entity IDs follow the device name; replace `my_washer` / `my_dryer` with yours.
+
+### Get notified when a program has finished
+
+```yaml
+triggers:
+  - trigger: state
+    entity_id: sensor.my_washer_status
+    to: program_ended
+actions:
+  - action: notify.mobile_app_my_phone
+    data:
+      message: The washing machine has finished.
+```
+
+### Show when the laundry will be done
+
+Add `sensor.my_washer_program_end` to a dashboard (e.g. a Tile card). It shows the expected end time and stays after the program ends until the appliance is switched off. For a delayed start it includes the delay.
+
+### Add the dryer to the Energy dashboard
+
+**Settings → Dashboards → Energy → Individual devices → Add device** → `sensor.my_dryer_lifetime_energy_consumption`. Only for appliances that report the counter (see [Supported appliances](#supported-appliances), footnote 1).
+
+### Switch the dryer off after it has finished
+
+```yaml
+triggers:
+  - trigger: state
+    entity_id: sensor.my_dryer_status
+    to: program_ended
+    for:
+      minutes: 30
+actions:
+  - action: switch.turn_off
+    target:
+      entity_id: switch.my_dryer_power
+```
+
+### Start a program from Home Assistant
+
+Program selection is not possible over the LAN, so prepare it on the appliance:
+
+1. Choose the program on the panel.
+2. Press the appliance's **remote start** (MobileStart) button. `binary_sensor.my_washer_mobile_start` turns on.
+3. Press `button.my_washer_start` (or use it in an automation).
+
+Start needs remote control enabled on the appliance, and is refused while mobile start is off or a delayed start is set; the error names the reason.
+
 ## Limitations
 
 - **Fridges, freezers and wine cabinets are read-only.** K7000/EasyControl firmware (XKM `EK057*`) has no LAN write path; every PUT/POST returns HTTP 403 (verified on a KF 7772 B). The Miele app writes via a device-initiated cloud WebSocket. [Miele's documentation](https://www.miele.de/support/customer-assistance/app-1199/alle_kategorien/mobilecontrol_und_mobilestart-132299522827): MobileStart is permanently on and not togglable on cooling appliances. State changes still arrive in real time via push.
