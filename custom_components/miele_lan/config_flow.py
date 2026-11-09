@@ -21,11 +21,9 @@ import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.components import zeroconf
-from homeassistant.const import CONF_HOST
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 
-from .api import MieleLanClient
 from .cloud import (
     CONSUMER_CLIENT_IDS,
     PKCEChallenge,
@@ -51,7 +49,6 @@ from .const import (
     CONF_HA_PORT,
     CONF_REFRESH_TOKEN,
     CONF_REGION,
-    CONF_ROUTE,
     CONF_STATIC_IPS,
     DEFAULT_HA_PUSH_PORT,
     DEFAULT_NAME,

@@ -18,7 +18,6 @@ config entry so re-installs keep the same identity.
 
 from __future__ import annotations
 
-import asyncio
 import binascii
 import datetime as dt
 import hashlib
