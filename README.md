@@ -210,6 +210,35 @@ still wake the appliance. Trade-off: consumable levels refresh only while the
 appliance is on. The 60 s `/State` poll is unchanged; whether that request
 alone wakes an appliance is not known.
 
+### Laundry and reliability fixes
+
+- **No TwinDos entities on tumble dryers.** Dryers report a dosing-container
+  slot too, but have no TwinDos; they used to get TwinDos sensors that only
+  showed `unknown`. After updating, the old dryer TwinDos entities show as
+  "no longer provided" and can be deleted in the entity settings. Wash2Dry
+  stays on dryers.
+- **Readable errors on dropped connections.** Any network failure of a
+  button or switch now reads "Could not connect to the appliance." instead
+  of "Unknown error".
+- **One request at a time per appliance**, so a poll, a push-triggered
+  refresh and a button press never hit the appliance's WiFi module at once.
+
+Not possible over the LAN on every appliance:
+
+- Energy and water consumption need either `/State.ExtendedState` (only a
+  few models send it) or DOP2 reads. Washers with an EK057 WiFi module
+  answer every DOP2 read with 404 and send no `ExtendedState`.
+- No power switch for washers and dryers yet. Washers with an EK057 module
+  reject every DOP2 write (404), so it cannot work there. Whether dryers
+  with an EK037 module accept the power write (DOP2 2/1586) is untested.
+
+### Security
+
+A daily workflow runs pip-audit, OSV-Scanner, Gitleaks and dependency
+review. Dependabot proposes weekly updates for test tools and actions. The
+`asyncmiele` version in `manifest.json` must match `requirements_test.txt`;
+a test enforces it, so the version users run is the audited one.
+
 ### Releases
 
 Releases are cut by [release-please](https://github.com/googleapis/release-please)
