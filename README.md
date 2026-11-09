@@ -1,136 +1,131 @@
 <p align="center">
-  <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=Gyang91&repository=ha-miele-at-lan&category=integration">
-    <img alt="Open in HACS" src="https://my.home-assistant.io/badges/hacs_repository.svg"/>
-  </a>
+  <img alt="Miele@LAN" src="custom_components/miele_lan/brand/icon@2x.png" width="128"/>
+</p>
+
+<h1 align="center">Miele@LAN</h1>
+
+<p align="center">
+  <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=Gyang91&repository=ha-miele-at-lan&category=integration"><img alt="Open in HACS" src="https://my.home-assistant.io/badges/hacs_repository.svg"/></a>
 </p>
 <p align="center">
-  <a href="https://github.com/Gyang91/ha-miele-at-lan/releases/latest">
-    <img alt="Latest release" src="https://img.shields.io/github/v/release/Gyang91/ha-miele-at-lan?label=release"/>
-  </a>
-  <a href="https://www.home-assistant.io">
-    <img alt="HA 2024.12+" src="https://img.shields.io/badge/HA-2024.12%2B-blue.svg"/>
-  </a>
-  <a href="LICENSE">
-    <img alt="License" src="https://img.shields.io/github/license/Gyang91/ha-miele-at-lan.svg"/>
-  </a>
+  <a href="https://github.com/Gyang91/ha-miele-at-lan/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Gyang91/ha-miele-at-lan?label=release"/></a>
+  <a href="https://github.com/Gyang91/ha-miele-at-lan/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Gyang91/ha-miele-at-lan/actions/workflows/ci.yml/badge.svg"/></a>
+  <a href="https://github.com/Gyang91/ha-miele-at-lan/actions/workflows/validate.yml"><img alt="Validate" src="https://github.com/Gyang91/ha-miele-at-lan/actions/workflows/validate.yml/badge.svg"/></a>
+  <a href="https://github.com/Gyang91/ha-miele-at-lan/actions/workflows/security-audit.yml"><img alt="Security audit" src="https://github.com/Gyang91/ha-miele-at-lan/actions/workflows/security-audit.yml/badge.svg"/></a>
+  <a href="https://www.home-assistant.io"><img alt="HA 2024.12+" src="https://img.shields.io/badge/HA-2024.12%2B-blue.svg"/></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/Gyang91/ha-miele-at-lan.svg"/></a>
 </p>
 
-# Miele@LAN
+Local Home Assistant integration for Miele@home appliances. Talks directly to the appliance over the LAN: no cloud account at runtime, no sidecar server, no Miele 3rd-party API.
 
-> **Fork note.** This is a fork of [tiehfood/ha-miele-at-lan](https://github.com/tiehfood/ha-miele-at-lan).
-> Its main fix: background polling no longer wakes washers, dryers and dishwashers
-> (`PUT /State {"DeviceAction": 2}` every 10 minutes kept them out of standby, e.g. a
-> dryer's drum light switching on at night). The domain stays `miele_lan`, so it
-> replaces the original in place. Version numbers are this fork's own: install it
-> from `Gyang91/ha-miele-at-lan` in HACS. See [CHANGELOG.md](CHANGELOG.md) and
-> [Fork changes](#fork-changes).
+Fork of [tiehfood/ha-miele-at-lan](https://github.com/tiehfood/ha-miele-at-lan). Same domain (`miele_lan`), so it replaces the original in place. Version numbers are this fork's own. Differences: [Fork changes](#fork-changes). History: [CHANGELOG.md](CHANGELOG.md).
 
-Local Home Assistant integration for Miele@home appliances — ovens, hobs, dishwashers, washers, dryers, fridges, freezers, hoods, coffee systems, dish warmers, wine cabinets. Talks directly to the appliance over the LAN. No cloud account is required to run, no sidecar server, no Miele 3rd-party API.
+## Features
 
-- Speaks Miele's local REST + DOP2 binary protocol — `MieleH256` HMAC-SHA256 + AES-CBC, signed with your household `GroupKey`
-- Real-time state via Miele's own **SuperVision push** channel — sub-second updates with a low-rate polling fallback (1 s active, 30 s idle)
-- mDNS auto-discovery (`_mieleathome._tcp`) — one config-flow click adds every appliance in the household
-- One-shot factory-fresh **provisioning tool** included (`tools/miele_lan_provision.py`) — for households without an existing Miele app
-- Optional Miele cloud OAuth pairing — fetches your household `GroupKey` once so the Miele app keeps working alongside HA
-- Read-only by design for cooling appliances (fridge/freezer/wine cabinet — see [Limitations](#limitations))
+- Miele's local REST + DOP2 binary protocol: `MieleH256` HMAC-SHA256 + AES-CBC, signed with the household `GroupKey`.
+- Real-time state via Miele's **SuperVision push**. Polling runs alongside: every 60 s, every 10 s while a programme runs on an appliance without push.
+- Never wakes an appliance in the background. Waking happens only on a user action (wake button, power switch).
+- mDNS auto-discovery (`_mieleathome._tcp`): one config flow adds every appliance in the household.
+- Provisioning tool for factory-fresh appliances: `tools/miele_lan_provision.py`.
+- Optional Miele cloud OAuth pairing: fetches the household `GroupKey` once; the Miele app keeps working.
+- Cooling appliances are read-only (see [Limitations](#limitations)).
 
 ## Supported appliances
 
 | Family | Models | Sensors | Controls |
 |---|---|---|---|
-| **Oven** (incl. steam, combi, microwave) | H7560BP, H7164BP, DGC7860HCXL, DGM7440, … | status, program, phase, remaining/elapsed/start time, cavity & core temps, target & core-target, door, signals, light | stop, wake, power, light |
-| **Hob** | KM7576, KM7895 FL induction, induction + extractor | per-zone power (1..12 incl. ½ steps, boost/boost+, keep-warm), per-zone residual heat, per-zone timer, status | — |
-| **Dishwasher** | G7000-series + semi-pro/professional | status, program, phase, remaining/elapsed time, door, signals, AutoDos PowerDisk level, salt & rinse aid levels† | start / stop / pause / resume, wake, power |
-| **Washer / dryer / washer-dryer** | WWG/TWC/WWV/WTV series | status, program, phase, drying step, remaining/elapsed/start time, door, signals | start / stop, wake |
-| **Fridge / freezer / fridge-freezer** | KF 7772 B, K 7000, KFN, KFNS, … | per-zone current + target temp, per-zone door, SuperCool, SuperFreeze, failure | — *(see Limitations)* |
-| **Wine cabinet** | KWT 6000, KWNS, KWTUS, wine + freezer | per-zone temp, per-zone door, light state | — *(see Limitations)* |
-| **Hood / range vent** | DA series, EK039W | fan step, light state, grease & charcoal filter saturation† | fan (off / 1-3 / boost)†, fan run-on time†, light, power‡ |
+| **Oven** (incl. steam, combi, microwave) | H7560BP, H7164BP, DGC7860HCXL, DGM7440, … | status, program, phase, remaining/elapsed/start-in, program start/end time, cavity & core temps, target & core-target, door, signals, light | stop, wake, power, light |
+| **Hob** | KM7576, KM7895 FL induction, induction + extractor | per-zone power (1..12 incl. ½ steps, boost/boost+, keep-warm), residual heat, timer, status | — |
+| **Dishwasher** | G7000 series, semi-pro/professional | status, program, phase, remaining/elapsed/start-in, program start/end time, door, signals, AutoDos, salt, rinse aid, lifetime energy & water ¹ | start / stop / pause / resume, wake, power |
+| **Washing machine** | WWG/WWV/WWI/WTV series | status, program, phase, spin speed, target temp, remaining/elapsed/start-in, program start/end time, door, signals, Smart Grid, TwinDos levels & Wash2Dry ¹ | start / stop, wake |
+| **Tumble dryer** | TWC/TWV/TMV series | status, program, phase, drying step, remaining/elapsed/start-in, program start/end time, door, signals, Smart Grid, Wash2Dry, energy per program & lifetime ¹ | start / stop, wake, power ² |
+| **Fridge / freezer / fridge-freezer** | KF 7772 B, K 7000, KFN, KFNS, … | per-zone current & target temp, per-zone door, SuperCool, SuperFreeze, failure | — (see [Limitations](#limitations)) |
+| **Wine cabinet** | KWT 6000, KWNS, KWTUS, wine + freezer | per-zone temp, per-zone door, light state | — (see [Limitations](#limitations)) |
+| **Hood / range vent** | DA series, EK039W | fan step, light state, grease & charcoal filter saturation ³ | fan (off / 1-3 / boost) ³, fan run-on time ³, light, power ⁴ |
 | **Coffee system** | CVA series | status | wake, power, light |
 | **Dish warmer** | ESW series | status, door | wake, power |
 
-Diagnostic entities (raw enums, WLAN info, push state, firmware version) are created but disabled by default — enable them per device under **Configure entities**.
+Diagnostic entities (raw enums, WLAN info, push state, firmware version) are created but disabled by default. Enable them per device under **Configure entities**.
 
-† Hood ventilation, run-on time and filter saturation use the legacy Dop1 protocol, which the official Miele app itself picks for hoods reporting `ProtocolVersion 2` — the DOP2 path every other control here uses answers HTTP 404 on this hardware. Hoods reporting 3/4 keep the read-only fan-step sensor and the light, and get a power switch instead (see next footnote).
-
-‡ Power switch only appears for hoods reporting `ProtocolVersion 3/4`. Dop1-capable hoods already expose off via the fan entity's own on/off control, and GLOBAL_USER_REQ — the opcode the switch falls back to — answers HTTP 404 on them, so a second, non-functional switch would only confuse users.
+1. From DOP2 leaf `2/1585`. Only where the WiFi module exposes DOP2 (not on EK057 washers with firmware 08.x). Read only while the appliance is on; the entities appear once the leaf first answers. Energy in Wh and water in L are the appliance's own counters (`total_increasing`, Energy dashboard ready); program counters restart with each program.
+2. DOP2 leaf `2/1586`. Tested on an EK037 module: off within a second; on via wake-and-retry.
+3. Legacy Dop1 protocol, used for hoods reporting `ProtocolVersion 2`, as the official Miele app does. Hoods reporting 3/4 keep the read-only fan step and the light, and get a power switch instead.
+4. Only for hoods reporting `ProtocolVersion 3/4`. On Dop1 hoods the fan entity covers on/off, and GLOBAL_USER_REQ (the switch's fallback) answers HTTP 404.
 
 ### Integrated extractor speed (KMDA7876)
 
-The KMDA7876 exposes a read-only **Extractor speed** sensor: Off, levels 1–3,
-and Boost.
-It also exposes a read-only **Extractor** fan entity with on/off state and
-speed percentages (0%, 25%, 50%, 75%, 100%; 100% means Boost). These represent
-discrete speed steps, not measured airflow. Fan controls are not supported.
+Read-only **Extractor speed** sensor (Off, 1–3, Boost) and read-only **Extractor** fan entity (0 / 25 / 50 / 75 / 100 %, 100 % = Boost). Discrete steps, not measured airflow. No fan control.
 
 ## Installation
 
 ### HACS
 
-[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=tiehfood&repository=ha-miele-at-lan&category=integration)
+[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Gyang91&repository=ha-miele-at-lan&category=integration)
 
-Or manually: HACS → ⋮ → Custom repositories → add `https://github.com/tiehfood/ha-miele-at-lan` as **Integration** → install → restart HA.
+Or: HACS → ⋮ → Custom repositories → `https://github.com/Gyang91/ha-miele-at-lan`, type **Integration** → download → restart HA.
+
+Switching from the original repository: remove `tiehfood/ha-miele-at-lan` in HACS, add this one, download, restart. Config entries, devices and entity IDs are kept.
 
 ### Manual
 
-Copy `custom_components/miele_lan/` into your HA config (final path: `<config>/custom_components/miele_lan/`) and restart.
+Copy `custom_components/miele_lan/` to `<config>/custom_components/miele_lan/` and restart.
 
 ### Adding your household
 
 **Settings → Devices & services → Add Integration → Miele@LAN.** Three setup paths:
 
-- **Cloud pairing (recommended).** Log in once with your Miele account; HA fetches the household `GroupKey` from Miele's cloud, mDNS-discovers every appliance, and provisions a SuperVision push listener. The Miele app continues to work in parallel. Pick the country your Miele *account* is registered with — that is the sales company, not necessarily where you live now; HA works out which regional backend holds your household on its own.
-- **Paste pre-obtained tokens.** Skip the in-flow OAuth if you already have an `access_token` + `refresh_token` from a Miele OAuth flow against `prod.map.miele-iot.com` (e.g. captured during the Cloud-pairing step in another HA instance).
-- **Paste household credentials.** If you've already extracted `GroupID` + `GroupKey` (e.g. from `MieleRESTServer`), paste them directly — no cloud round-trip needed. This path never touches the cloud, so it works regardless of which country your account belongs to.
+- **Cloud pairing (recommended).** Log in once with your Miele account; HA fetches the household `GroupKey`, mDNS-discovers every appliance and provisions a SuperVision push listener. The Miele app keeps working. Pick the country your Miele *account* is registered with (the sales company, not necessarily where you live); HA finds the regional backend itself.
+- **Paste pre-obtained tokens.** An `access_token` + `refresh_token` from a Miele OAuth flow against `prod.map.miele-iot.com`.
+- **Paste household credentials.** `GroupID` + `GroupKey` (e.g. from `MieleRESTServer`). No cloud round-trip; works for every country.
 
-For factory-fresh appliances, run `python tools/miele_lan_provision.py` on your laptop first to commission them — this writes a new `GroupID`/`GroupKey` and binds the appliance to your LAN.
+Factory-fresh appliances: run `python tools/miele_lan_provision.py` first. It writes a new `GroupID`/`GroupKey` and binds the appliance to your LAN.
 
-**Warning: the appliance does not validate commissioning payloads.** An empty `GroupKey` and a `GroupID` of `0` are accepted with `200 OK`, and the appliance then considers itself commissioned — every later write of the real keys is refused with `403 Forbidden`, with no way back over the LAN; recovery is only on the appliance itself, via settings menu → **Miele@home** → reset, then reconnect in the Miele app. Use `tools/miele_lan_provision.py`, which validates key lengths before sending — a hand-rolled `curl` or script does not, and the appliance will not catch the mistake for you.
+> **Warning:** the appliance does not validate commissioning payloads. An empty `GroupKey` or a `GroupID` of `0` is accepted with `200 OK`; every later write of the real keys is then refused with `403 Forbidden`. Recovery only on the appliance: settings → **Miele@home** → reset, then reconnect in the Miele app. Use `tools/miele_lan_provision.py`, which validates key lengths.
 
 ### Supported countries (cloud pairing)
 
-Cloud pairing works for every sales company Miele's MAP gateway serves — 49 at the time of
-writing, covering Europe, the Americas, and Asia-Pacific:
+Every sales company Miele's MAP gateway serves (49 at the time of writing):
 
 ```
 ae at au be bg br ca ch cl cn cy cz de dk ee es fi fr gb gr hk hr hu ie in it jp kr
 lt lu lv mx my nl no nz pl pt ro rs se sg si sk th tr ua us za
 ```
 
-Regenerate the table against the live gateway with:
+Check against the live gateway:
 
 ```sh
 python tools/dump_map_countries.py --check    # exits non-zero if Miele changed anything
 ```
 
-If your country is genuinely absent, use **Paste household credentials** instead — that path
-is region-independent.
+Country missing: use **Paste household credentials** (region-independent).
 
-### Capturing the OAuth redirect (Cloud pairing)
+### Capturing the OAuth redirect (cloud pairing)
 
-The cloud-pair flow opens a Miele login page that ends with a `miele://oauth2-code/?code=…&state=…` redirect. Browsers refuse to navigate the `miele://` scheme, so the URL never appears in the address bar — you have to grab it from the network log:
+The login ends with a `miele://oauth2-code/?code=…&state=…` redirect that browsers refuse to open. Grab it from the network log:
 
-1. Open the authorization URL from the HA config-flow step in **Chrome / Edge on a desktop computer**.
-2. Open **DevTools → Network** tab (F12) **before** logging in, and enable *Preserve log* so the redirect isn't cleared.
+1. Open the authorization URL from the config flow in **Chrome / Edge on a desktop**.
+2. Open **DevTools → Network** (F12) **before** logging in; enable *Preserve log*.
 3. Log in with your Miele account.
-4. The browser will refuse the final navigation — that's expected. In the Network tab, find the **last request whose URL starts with `miele://`** (usually highlighted red as "blocked").
-5. Right-click that row → *Copy → Copy link address*.
-6. Paste the full `miele://oauth2-code/?code=…&state=…` URL into the config-flow input.
+4. Find the **last request whose URL starts with `miele://`** (blocked, usually red).
+5. Right-click → *Copy → Copy link address*.
+6. Paste the full URL into the config flow.
 
-Same flow works in Firefox (DevTools → Network → look for the blocked `miele://` redirect).
+Firefox: DevTools → Network → the blocked `miele://` redirect.
 
 ## Limitations
 
-- **Fridges, freezers, and wine cabinets are read-only over LAN.** Miele's K7000/EasyControl firmware (XKM `EK057*`) does not expose any LAN write path for cooling appliances — verified end-to-end against a Miele KF 7772 B. Setpoint writes from the Miele app reach the appliance via the device-initiated TLS WebSocket to `rest-eu.domestic.miele-iot.com` and the LAN HTTP server uniformly returns HTTP 403 for every PUT/POST regardless of authentication. This is [confirmed by Miele's own documentation](https://www.miele.de/support/customer-assistance/app-1199/alle_kategorien/mobilecontrol_und_mobilestart-132299522827): on cooling appliances, MobileStart is permanently on and not togglable. HA still receives state changes in real time via SuperVision push, so the Miele app's setpoint changes show up immediately.
-- **No firmware update trigger.** Read-only `/Update/`.
-- **`Mobile Controllable` on the panel** gates writes on cycle appliances (oven, dishwasher, washer/dryer). Enable it once on the appliance display before HA writes will succeed.
-- **One household per HA install.** Multiple Miele households need separate HA instances.
-- **mDNS is required.** Discovery, fab→IP resolution, and SuperVision push delivery all rely on `_mieleathome._tcp.local.` traffic flowing between HA and the appliances. HA and the appliances must share a broadcast domain (same VLAN, no Docker bridge in between, no IoT-VLAN isolation).
-
-† *Dishwasher consumable levels (AutoDos, salt, rinse aid) come from DOP2 leaf `2/1585` and are only exposed where the appliance's firmware surfaces that leaf — verified on a G7655 (XKM EK057S, FW 09.14, protocolVersion 4) against the Miele cloud API's values for the same machine. These entities are created once, at integration setup: if the appliance is in deep standby when HA (or the integration) loads and the first `2/1585` read misses, the entities appear only after the next integration reload — not on their own later. Once the leaf works, a later latch (3 poll cycles without a 200, or a 403/404) clears the cached context, so the entities go `unknown` rather than showing stale levels. The appliance must be awake at some point for the values to populate (the integration wakes and retries automatically, bounded to a few poll cycles).*
+- **Fridges, freezers and wine cabinets are read-only.** K7000/EasyControl firmware (XKM `EK057*`) has no LAN write path; every PUT/POST returns HTTP 403 (verified on a KF 7772 B). The Miele app writes via a device-initiated cloud WebSocket. [Miele's documentation](https://www.miele.de/support/customer-assistance/app-1199/alle_kategorien/mobilecontrol_und_mobilestart-132299522827): MobileStart is permanently on and not togglable on cooling appliances. State changes still arrive in real time via push.
+- **Washers with an EK057 module (firmware 08.x)** expose no DOP2 at all (no `DOP2` resource, every leaf 404). Without DOP2: no TwinDos levels, no energy/water, no Wash2Dry, no power switch. Over `/State` they accept `{"DeviceAction": 2}` but stay off, and refuse `{"DeviceAction": 3}` with HTTP 400. Tested on a WWI860.
+- **Energy and water** need DOP2 `2/1585` or a model-specific `/State.ExtendedState`.
+- **No program selection.** Start only runs the program chosen on the panel.
+- **No firmware update trigger.** `/Update/` is read-only.
+- **`Mobile Controllable`** must be enabled on the panel for writes to cycle appliances (oven, dishwasher, washer, dryer).
+- **One household per HA install.**
+- **mDNS required.** HA and the appliances must share a broadcast domain (same VLAN, no Docker bridge, no IoT-VLAN isolation).
 
 ## Troubleshooting
 
-**Appliance not discovered?** Miele mDNS won't cross routed boundaries — HA and the appliance must be on the same broadcast domain (same VLAN, no Docker bridge in between, no IoT-VLAN isolation rule). To check whether HA is actually receiving Miele mDNS, open the HA terminal add-on (or SSH in) and run:
+**Appliance not discovered.** Check that HA receives Miele mDNS (HA terminal app or SSH):
 
 ```sh
 # Home Assistant OS / Debian / most Linux
@@ -139,24 +134,15 @@ avahi-browse -rt _mieleathome._tcp
 dns-sd -B _mieleathome._tcp local.
 ```
 
-If nothing appears, your network is dropping the multicast — fix that before going further. Common culprits: IGMP-snooping on a managed switch with no IGMP querier, a VLAN ACL between HA and the appliance subnet, an mDNS-blocking firewall rule, or HA running in a Docker bridge (use `network_mode: host`).
+Nothing listed: the network drops multicast. Usual causes: IGMP snooping without an IGMP querier, a VLAN ACL, an mDNS-blocking firewall rule, HA in a Docker bridge (use `network_mode: host`).
 
-**Setup fails with "household … has no appliances"?** Check the log for a second line naming a *different* household. Miele's cloud only hands over the key for the household your account currently owns; if your appliances were commissioned into an earlier one — an app reinstall or a re-pair can do this — the two no longer match, and the cloud's household comes back empty. The Miele app keeps working because it holds the LAN key itself. Fix it by re-pairing the appliances in the Miele app so they join the current household, or by using **Paste household credentials** if you can obtain the GroupKey for the group the appliances actually advertise. If instead the log says no Miele appliance answered mDNS *at all*, it is a network problem — see above.
+**"household … has no appliances".** Check the log for a second line naming a *different* household: the appliances were commissioned into an earlier household than the one your account owns. Re-pair them in the Miele app, or use **Paste household credentials** with the GroupKey of the household they advertise. If no Miele appliance answered mDNS at all, it is a network problem (see above).
 
-**One appliance is missing while others in the same household work fine?** Since v1.10.1 the integration raises a **repair issue** naming the appliance it could not enrol and states this cause directly when it detects it, so check there first. The underlying problem is usually that the appliance was never fully commissioned into the household — an appliance with no household group cannot verify a signed request, so a signed `GET /Devices/` to it returns `404`, which looks like a wrong key but isn't. The fastest manual check is mDNS: compare the `_mieleathome._tcp` TXT records of a working appliance against the missing one.
+**One appliance missing.** The integration raises a **repair issue** naming it. Usually the appliance was never fully commissioned: its mDNS TXT record shows `group=` with nothing after it (compare with a working appliance using the commands above). Fix: appliance settings → **Miele@home** → reset, then reconnect in the Miele app.
 
-```sh
-# Home Assistant OS / Debian / most Linux
-avahi-browse -rt _mieleathome._tcp
-# macOS
-dns-sd -B _mieleathome._tcp local.
-```
+**Push not working (updates only every 60 s).** Enable `Mobile Controllable` on the appliance; make sure HA's listener port (default 18082) is reachable from the appliance subnet. The diagnostic **Push status** sensor shows `push:active` when push works.
 
-A commissioned appliance advertises a non-empty `group=<household id>`; an uncommissioned one advertises `group=` with nothing after it. Fix it the same way as above: appliance settings menu → **Miele@home** → reset, then reconnect it in the Miele app so it joins the household.
-
-**Push not firing (sensors only update every 30 s)?** Verify `Mobile Controllable` is on at the appliance, and that HA's listener port (default 18082) is reachable from the appliance subnet. Look for `push:active` in the diagnostic Push State sensor.
-
-**`HTTP error 403` on writes?** The appliance's `RemoteEnable` flag for `MobileCtrl` is `0`. Enable Mobile Controllable on the panel. Fridges, freezers, and wine cabinets stay 403 by firmware design — see Limitations.
+**`HTTP error 403` on writes.** `Mobile Controllable` is off on the panel. Cooling appliances always answer 403 (see [Limitations](#limitations)).
 
 **Debug logs:**
 
@@ -167,100 +153,42 @@ logger:
     asyncmiele: debug
 ```
 
+**Raw data for bug reports.** Services `miele_lan.dump_dop2_leaf` and `miele_lan.dump_rest_resource` read one DOP2 leaf or REST resource and return it (read-only).
+
 ## Development
 
 ```sh
-git clone https://github.com/tiehfood/ha-miele-at-lan
-cd miele
-python3 -m venv virtenv && . virtenv/bin/activate
-pip install -e .
-python -m pytest tests/
+git clone https://github.com/Gyang91/ha-miele-at-lan
+cd ha-miele-at-lan
+python3.14 -m venv .venv && . .venv/bin/activate
+pip install -r requirements_test.txt
+pytest tests/ -q
 ```
 
-Parser/protocol tests have no HA imports — they run on plain Python.
+Parser and protocol tests need no running Home Assistant.
 
 ## Fork changes
 
-### No background wake (1.17.1-fork.1, based on upstream v1.17.1 / `d1fd482`)
+Differences from upstream [tiehfood/ha-miele-at-lan](https://github.com/tiehfood/ha-miele-at-lan) v1.17.1:
 
-The device-context read (DOP2 `2/1585`: TwinDos, Wash2Dry, salt/rinse aid,
-AutoDos) ran every 10 minutes for washers, dryers and dishwashers. On HTTP 500
-(XKM asleep) it sent `PUT /State {"DeviceAction": 2}` and read again. When the
-wake worked, the miss counter reset, so the appliance was woken every 10
-minutes, day and night. On a dryer this shows as the drum light switching on
-while the machine is off.
+| Area | Change |
+|---|---|
+| Standby | Background polling never wakes an appliance. DOP2 `2/1585` is skipped while the appliance is off; a 500 while idle means "asleep" and never latches the leaf unsupported. Before, `PUT /State {"DeviceAction": 2}` every 10 minutes kept washers, dryers and dishwashers out of standby (drum light switching on at night). |
+| Polling | Push no longer restarts the poll timer, so poll-only data (DOP2 `2/1585`, WLAN, hours of operation) stays current during a program. |
+| Entities | DOP2 `2/1585` entities appear once the leaf first answers, not only at setup. TwinDos entities only on washers. |
+| New sensors | Program start / end time (all cycle appliances), Smart Grid, energy and water per program and lifetime. |
+| New controls | Power switch for tumble dryers. |
+| Reliability | All network errors reported readably; one request at a time per appliance. |
+| Code | Typed `entry.runtime_data`, shared error mapping, unused imports removed. |
+| Maintenance | release-please releases, CI (Python 3.14 / HA 2026.11), HACS + hassfest validation, daily security audit (pip-audit, OSV-Scanner, Gitleaks, dependency review), Dependabot. |
 
-Now `_maybe_refresh_device_context`:
-
-- never calls `wake()`;
-- skips the read while `/State.Status` is off (1) or not_connected (255); the
-  throttle is not advanced, so the read happens on the first poll after the
-  appliance is switched on;
-- treats a 500 or a fetch failure as "asleep" unless a programme runs (Status
-  in_use): the last value is kept, no miss is counted, and a sleeping appliance
-  is never latched unsupported (G7655 case);
-- counts a 500 or a fetch failure as a miss while a programme runs; 3
-  consecutive misses latch the leaf unsupported as before (issue #16, G7310).
-  403/404 still latch at once.
-
-Waking after a user action is unchanged: the wake button and the power switch
-still wake the appliance. Trade-off: consumable levels refresh only while the
-appliance is on. The 60 s `/State` poll is unchanged; whether that request
-alone wakes an appliance is not known.
-
-### Laundry and reliability fixes
-
-- **No TwinDos entities on tumble dryers.** Dryers report a dosing-container
-  slot too, but have no TwinDos; they used to get TwinDos sensors that only
-  showed `unknown`. After updating, the old dryer TwinDos entities show as
-  "no longer provided" and can be deleted in the entity settings. Wash2Dry
-  stays on dryers.
-- **Readable errors on dropped connections.** Any network failure of a
-  button or switch now reads "Could not connect to the appliance." instead
-  of "Unknown error".
-- **One request at a time per appliance**, so a poll, a push-triggered
-  refresh and a button press never hit the appliance's WiFi module at once.
-- **Program start and Program end** as clock times (timestamp sensors) for
-  washers, dryers, dishwashers and ovens, like the official integration's
-  Start and Finish. Computed from the reported minutes, a delayed start
-  included. The end stays visible after the program ends and clears once
-  the appliance is idle.
-- **Smart Grid** binary sensor, from the second element of
-  `/State.RemoteEnable`.
-- **Power switch for tumble dryers** (tested on an EK037 module): the DOP2
-  2/1586 write switches them off within a second, waking switches them on.
-
-Not possible over the LAN on every appliance:
-
-- Energy and water consumption need either `/State.ExtendedState` (only a
-  few models send it) or DOP2 reads. Washers with an EK057 WiFi module
-  answer every DOP2 read with 404 and send no `ExtendedState`.
-- No power switch for washers. Tested on a WWI860 with an EK057 module: it
-  rejects every DOP2 write (404); over `/State` it accepts
-  `{"DeviceAction": 2}` but stays off, and answers `{"DeviceAction": 3}`
-  (go to standby) with HTTP 400. Its WiFi module lists no DOP2 resource at
-  all, and reports no newer firmware.
-
-### Security
-
-A daily workflow runs pip-audit, OSV-Scanner, Gitleaks and dependency
-review. Dependabot proposes weekly updates for test tools and actions. The
-`asyncmiele` version in `manifest.json` must match `requirements_test.txt`;
-a test enforces it, so the version users run is the audited one.
-
-### Releases
-
-Releases are cut by [release-please](https://github.com/googleapis/release-please)
-from conventional commits: `feat:`, `fix:` and `perf:` release, `chore:`,
-`ci:`, `docs:` and `test:` do not. The release workflow tests, merges and tags
-its own release pull request, so a release needs no manual step. HACS installs
-from the tag.
+Releases follow conventional commits: `feat:`, `fix:` and `perf:` release; `chore:`, `ci:`, `docs:` and `test:` do not.
 
 ## Disclaimer
 
 This project is independent and not affiliated with, endorsed by, or supported by Miele & Cie. KG. **Miele®** and **Miele@home®** are registered trademarks of Miele & Cie. KG; the appliance model names (KM, H, DGC, G, WWG, TWC, KF, KFN, KWT, KWNS, ESW, CVA, DA) are likewise Miele trademarks used here purely for identification. Use of this software may void your appliance warranty — use at your own risk.
 
-The brand icons at `custom_components/miele_lan/brand/` are the property of Miele & Cie. KG and are bundled here so Home Assistant can render the manufacturer logo on the device card. If a Miele representative would like them removed or replaced, please open an issue.
+The brand icons at `custom_components/miele_lan/brand/` (also shown at the top of this page) are the property of Miele & Cie. KG and are bundled so Home Assistant can show the manufacturer logo on the device card. If a Miele representative would like them removed or replaced, please open an issue.
 
 ## Credits
 
@@ -270,6 +198,5 @@ Built on years of prior reverse-engineering. Thanks to:
 - **[schneidair](https://community.home-assistant.io/u/schneidair)** — independent discovery of the `MielePairing:Pairing` auth on EK057S.
 - **[ajander](https://community.home-assistant.io/u/ajander)** — SpeedOven commissioning pcap.
 - **[astrandb](https://github.com/astrandb)** + the HA core Miele maintainers — upstream cloud integration and [`pymiele`](https://pypi.org/project/pymiele/), used here for cross-reference.
+- **[tiehfood](https://github.com/tiehfood)** — the original Miele@LAN integration this fork is based on.
 - **HA Community thread [#840093](https://community.home-assistant.io/t/mielerestserver-miele-home-without-cloud-possible/840093)** contributors — for surfacing SuperVision, model quirks, and the OTA hosts.
-
-If you find Miele@home material elsewhere that ought to be credited here, please open a PR.
