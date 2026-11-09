@@ -20,6 +20,12 @@
 
 # Miele@LAN
 
+> **Fork note.** This is a fork of [tiehfood/ha-miele-at-lan](https://github.com/tiehfood/ha-miele-at-lan)
+> with one fix: background polling no longer wakes washers, dryers and dishwashers
+> (`PUT /State {"DeviceAction": 2}` every 10 minutes kept them out of standby, e.g. a
+> dryer's drum light switching on at night). The domain stays `miele_lan`, so it
+> replaces the original in place. See [CHANGELOG.md](CHANGELOG.md).
+
 Local Home Assistant integration for Miele@home appliances — ovens, hobs, dishwashers, washers, dryers, fridges, freezers, hoods, coffee systems, dish warmers, wine cabinets. Talks directly to the appliance over the LAN. No cloud account is required to run, no sidecar server, no Miele 3rd-party API.
 
 - Speaks Miele's local REST + DOP2 binary protocol — `MieleH256` HMAC-SHA256 + AES-CBC, signed with your household `GroupKey`
