@@ -2119,6 +2119,12 @@
       },
       "program_end": {
         "name": "Programmende"
+      },
+      "lifetime_energy": {
+        "name": "Gesamter Energieverbrauch"
+      },
+      "lifetime_water": {
+        "name": "Gesamter Wasserverbrauch"
       }
     },
     "binary_sensor": {

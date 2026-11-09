@@ -21,8 +21,10 @@ from homeassistant.components.sensor import (
 from homeassistant.const import (
     REVOLUTIONS_PER_MINUTE,
     EntityCategory,
+    UnitOfEnergy,
     UnitOfTemperature,
     UnitOfTime,
+    UnitOfVolume,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -843,6 +845,8 @@ DOP2_SENSORS: tuple[MieleLanDop2SensorDef, ...] = (
 class MieleLanDeviceContextSensorDescription(SensorEntityDescription):
     value_fn: Callable[[dict[str, Any]], Any]
     container_index: int | None = None
+    # Only created when the appliance reports this device-context key.
+    required_key: str | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -960,6 +964,33 @@ DEVICE_CONTEXT_SENSORS: tuple[MieleLanDeviceContextSensorDef, ...] = (
             entity_category=EntityCategory.DIAGNOSTIC,
             container_index=None,
             value_fn=lambda ctx: _consumable_percent(ctx, "rinse_aid_percent"),
+        ),
+    ),
+    # Lifetime totals the appliance keeps itself (Energy dashboard ready).
+    MieleLanDeviceContextSensorDef(
+        types=(*LAUNDRY_FAMILY, *DISHWASHER_FAMILY),
+        description=MieleLanDeviceContextSensorDescription(
+            key="lifetime_energy",
+            translation_key="lifetime_energy",
+            device_class=SensorDeviceClass.ENERGY,
+            state_class=SensorStateClass.TOTAL_INCREASING,
+            native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+            suggested_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+            suggested_display_precision=1,
+            required_key="lifetime_energy_wh",
+            value_fn=lambda ctx: ctx.get("lifetime_energy_wh"),
+        ),
+    ),
+    MieleLanDeviceContextSensorDef(
+        types=(*LAUNDRY_FAMILY, *DISHWASHER_FAMILY),
+        description=MieleLanDeviceContextSensorDescription(
+            key="lifetime_water",
+            translation_key="lifetime_water",
+            device_class=SensorDeviceClass.WATER,
+            state_class=SensorStateClass.TOTAL_INCREASING,
+            native_unit_of_measurement=UnitOfVolume.LITERS,
+            required_key="lifetime_water_l",
+            value_fn=lambda ctx: ctx.get("lifetime_water_l"),
         ),
     ),
 )
@@ -1139,6 +1170,9 @@ def _device_context_sensors(coord: MieleLanCoordinator) -> list[SensorEntity]:
             continue
         ci = d.description.container_index
         if ci is not None and len(containers) <= ci:
+            continue
+        rk = d.description.required_key
+        if rk is not None and ctx.get(rk) is None:
             continue
         entities.append(MieleLanDeviceContextSensor(coord, d.description))
     return entities

@@ -2119,6 +2119,12 @@
       },
       "program_end": {
         "name": "Program end"
+      },
+      "lifetime_energy": {
+        "name": "Lifetime energy consumption"
+      },
+      "lifetime_water": {
+        "name": "Lifetime water consumption"
       }
     },
     "binary_sensor": {

@@ -261,6 +261,26 @@ def dos_container_field(ctx: dict[str, Any], idx: int, key: str) -> Any:
     return container.get(key)
 
 
+def _lifetime_counter(attrs: dict | None, key: int) -> int | None:
+    """Accumulated total kept in GLOBAL_DeviceAttributesDWTDWM attribute `key`.
+
+    Attributes 5 (energy, Wh) and 6 (water, litres) are structs: field 1 says
+    whether the appliance keeps this counter (0 = not kept) and field 4 holds
+    the total. Verified on a G7655 dishwasher against the Miele app (upstream
+    PR #63) and on an EK037 tumble dryer, which keeps energy but not water.
+    """
+    if not attrs:
+        return None
+    entry = attrs.get(key)
+    if not entry or entry[0] != 0x10 or not isinstance(entry[1], dict):
+        return None
+    fields = entry[1]
+    if not fields.get(1, (None, 0))[1]:
+        return None
+    total = fields.get(4, (None, None))[1]
+    return total if isinstance(total, int) and total >= 0 else None
+
+
 def parse_global_device_context(payload: bytes) -> dict[str, Any]:
     """DOP2 2/1585 — GLOBAL_DeviceContext.
 
@@ -320,6 +340,8 @@ def parse_global_device_context(payload: bytes) -> dict[str, Any]:
             device_attributes.get(9, (None, None))[1]
             if device_attributes else None
         ),
+        "lifetime_energy_wh": _lifetime_counter(device_attributes, 5),
+        "lifetime_water_l": _lifetime_counter(device_attributes, 6),
         # GLOBAL_EnumDoorState: 0 unknown, 1 open, 2 closed, 3 locked,
         # 4 drying plus. Follows the door on a G7197 whose SignalDoor
         # never changes (issue #59).
