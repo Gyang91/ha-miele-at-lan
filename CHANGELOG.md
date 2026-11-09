@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.0](https://github.com/Gyang91/ha-miele-at-lan/compare/v1.19.0...v1.20.0) (2026-11-09)
+
+
+### Features
+
+* **switch:** Add the power switch for tumble dryers ([7d90915](https://github.com/Gyang91/ha-miele-at-lan/commit/7d90915f2957ec54e2ff086ceb18c1439d4e8a1f))
+
 ## [1.19.0](https://github.com/Gyang91/ha-miele-at-lan/compare/v1.18.1...v1.19.0) (2026-11-09)
 
 
