@@ -139,6 +139,14 @@ BINARY_SENSOR_TYPES: tuple[MieleLanBinarySensorDef, ...] = (
     MieleLanBinarySensorDef(
         types=CYCLE_FAMILY,
         description=MieleLanBinarySensorDescription(
+            key="smart_grid",
+            translation_key="smart_grid",
+            is_on_fn=lambda s: bool((s.get("RemoteEnable") or [0, 0, 0])[1]),  # type: ignore[index]
+        ),
+    ),
+    MieleLanBinarySensorDef(
+        types=CYCLE_FAMILY,
+        description=MieleLanBinarySensorDescription(
             key="mobile_start",
             translation_key="mobile_start",
             is_on_fn=lambda s: bool((s.get("RemoteEnable") or [0, 0, 0])[2]),  # type: ignore[index]

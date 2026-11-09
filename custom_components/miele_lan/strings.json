@@ -2113,6 +2113,12 @@
           "3": "3",
           "boost": "Boost"
         }
+      },
+      "program_start": {
+        "name": "Program start"
+      },
+      "program_end": {
+        "name": "Program end"
       }
     },
     "binary_sensor": {
@@ -2187,6 +2193,9 @@
       },
       "twindos_2_empty": {
         "name": "TwinDos compartment 2 empty"
+      },
+      "smart_grid": {
+        "name": "Smart Grid"
       }
     },
     "switch": {

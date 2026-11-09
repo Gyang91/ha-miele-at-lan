@@ -26,6 +26,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from . import enums
 from .extended_state import (
@@ -52,6 +53,7 @@ from .const import (
 )
 from .coordinator import MieleLanCoordinator
 from .dop2 import dos_container_field
+from .program_times import program_timestamps, stabilise
 from .entity import MieleLanEntity
 from .runtime import MieleLanConfigEntry
 
@@ -261,6 +263,12 @@ class MieleLanSensorDescription(SensorEntityDescription):
 
 
 @dataclass(frozen=True, kw_only=True)
+class MieleLanProgramTimeSensorDescription(SensorEntityDescription):
+    # 0 = program start, 1 = program end (see program_times.program_timestamps)
+    which: int
+
+
+@dataclass(frozen=True, kw_only=True)
 class MieleLanIdentSensorDescription(SensorEntityDescription):
     value_fn: Callable[[dict[str, Any]], Any]
 
@@ -276,6 +284,24 @@ class MieleLanSensorDef:
 class MieleLanIdentSensorDef:
     types: tuple[MieleAppliance, ...]
     description: MieleLanIdentSensorDescription
+
+
+# --- program start / end as clock times ---------------------------------------
+
+PROGRAM_TIME_SENSORS: tuple[MieleLanProgramTimeSensorDescription, ...] = (
+    MieleLanProgramTimeSensorDescription(
+        key="program_start",
+        translation_key="program_start",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        which=0,
+    ),
+    MieleLanProgramTimeSensorDescription(
+        key="program_end",
+        translation_key="program_end",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        which=1,
+    ),
+)
 
 
 # --- /State-derived sensors ---------------------------------------------------
@@ -1069,6 +1095,10 @@ async def async_setup_entry(
                 entities.append(MieleLanProgramRawSensor(coord, d.description))
             else:
                 entities.append(MieleLanSensor(coord, d.description))
+        if dt in CYCLE_FAMILY:
+            entities.extend(
+                MieleLanProgramTimeSensor(coord, d) for d in PROGRAM_TIME_SENSORS
+            )
         for d in IDENT_SENSORS:
             if dt in d.types:
                 entities.append(MieleLanIdentSensor(coord, d.description))
@@ -1123,6 +1153,38 @@ class MieleLanSensor(MieleLanEntity, SensorEntity):
             return self.entity_description.value_fn(self.coordinator.data.state)
         except Exception:  # noqa: BLE001
             return None
+
+
+class MieleLanProgramTimeSensor(MieleLanEntity, SensorEntity):
+    """Program start or end as a clock time ("finished at 14:35").
+
+    The appliance reports whole minutes only, so the value is held while a
+    new one differs by rounding alone. When the time is unknown but the
+    appliance is not idle (program ended, programmed but not started) the
+    last value stays; it clears once the appliance is idle.
+    """
+
+    entity_description: MieleLanProgramTimeSensorDescription
+
+    def __init__(
+        self,
+        coordinator: MieleLanCoordinator,
+        description: MieleLanProgramTimeSensorDescription,
+    ) -> None:
+        super().__init__(coordinator, description.key)
+        self.entity_description = description
+        self._last: _dt.datetime | None = None
+
+    @property
+    def native_value(self) -> _dt.datetime | None:
+        state = self.coordinator.data.state if self.coordinator.data else {}
+        value = program_timestamps(state, dt_util.utcnow())[self.entity_description.which]
+        if value is None:
+            if _is_idle(state):
+                self._last = None
+            return self._last
+        self._last = stabilise(self._last, value)
+        return self._last
 
 
 class MieleLanProgramSensor(MieleLanEntity, SensorEntity):

@@ -222,6 +222,13 @@ alone wakes an appliance is not known.
   of "Unknown error".
 - **One request at a time per appliance**, so a poll, a push-triggered
   refresh and a button press never hit the appliance's WiFi module at once.
+- **Program start and Program end** as clock times (timestamp sensors) for
+  washers, dryers, dishwashers and ovens, like the official integration's
+  Start and Finish. Computed from the reported minutes, a delayed start
+  included. The end stays visible after the program ends and clears once
+  the appliance is idle.
+- **Smart Grid** binary sensor, from the second element of
+  `/State.RemoteEnable`.
 
 Not possible over the LAN on every appliance:
 
