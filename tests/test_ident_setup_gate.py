@@ -12,8 +12,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import frame
 
 from custom_components.miele_lan import fan
-from custom_components.miele_lan.const import DOMAIN, MieleAppliance
+from custom_components.miele_lan.const import MieleAppliance
 from custom_components.miele_lan.coordinator import MieleLanCoordinator, MieleLanData
+from custom_components.miele_lan.runtime import MieleLanRuntimeData
 
 
 @pytest.fixture
@@ -34,10 +35,17 @@ def make_coordinator(tmp_path, monkeypatch):
             state={"VentilationStep": 2},
         )
         coord.data = coord._data
-        hass.data[DOMAIN] = {"test": {"coordinators": {"hood": coord}}}
         return hass, coord
 
     return make
+
+
+def _entry(coord):
+    """A loaded config entry whose runtime data holds `coord`."""
+    return SimpleNamespace(
+        entry_id="test",
+        runtime_data=MieleLanRuntimeData(coordinators={coord.fab: coord}),
+    )
 
 
 @pytest.mark.asyncio
@@ -49,7 +57,7 @@ async def test_ident_present_first_try_does_no_extra_work(make_coordinator):
 
     coord._fetch_full_ident.assert_not_called()
     entities: list = []
-    await fan.async_setup_entry(hass, SimpleNamespace(entry_id="test"), entities.extend)
+    await fan.async_setup_entry(hass, _entry(coord), entities.extend)
     assert len(entities) == 1
     assert isinstance(entities[0], fan.MieleLanFan)
 
@@ -69,7 +77,7 @@ async def test_ident_empty_then_populated_creates_gated_entities(make_coordinato
     assert any("setup retry" in r.message for r in caplog.records)
 
     entities: list = []
-    await fan.async_setup_entry(hass, SimpleNamespace(entry_id="test"), entities.extend)
+    await fan.async_setup_entry(hass, _entry(coord), entities.extend)
     assert len(entities) == 1
     assert isinstance(entities[0], fan.MieleLanFan)
 
@@ -88,7 +96,7 @@ async def test_ident_never_populated_setup_completes_without_looping(make_coordi
     assert any("still empty after 3 setup retries" in r.message for r in caplog.records)
 
     entities: list = []
-    await fan.async_setup_entry(hass, SimpleNamespace(entry_id="test"), entities.extend)
+    await fan.async_setup_entry(hass, _entry(coord), entities.extend)
     assert entities == []
 
 

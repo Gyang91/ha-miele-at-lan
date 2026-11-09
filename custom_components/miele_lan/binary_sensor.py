@@ -10,7 +10,6 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -18,7 +17,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import (
     COOLING_FAMILY,
     CYCLE_FAMILY,
-    DOMAIN,
     DOORED_FAMILY,
     HOB_FAMILY,
     TWINDOS_FAMILY,
@@ -28,6 +26,7 @@ from .const import (
 from .coordinator import MieleLanCoordinator, MieleLanData
 from .dop2 import dos_container_field
 from .entity import MieleLanEntity
+from .runtime import MieleLanConfigEntry
 from .extended_state import hob_zone_count, parse_hob_extended_state
 
 ALL_TYPES: tuple[MieleAppliance, ...] = tuple(
@@ -256,11 +255,10 @@ def _present_door_zones(coord: MieleLanCoordinator) -> set[int]:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: MieleLanConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    bundle = hass.data[DOMAIN][entry.entry_id]
-    coordinators: dict[str, MieleLanCoordinator] = bundle["coordinators"]
+    coordinators = entry.runtime_data.coordinators
     entities = []
     for coord in coordinators.values():
         dt = coord.device_type

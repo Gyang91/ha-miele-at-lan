@@ -17,24 +17,23 @@ import logging
 from typing import Any
 
 from homeassistant.components.light import ColorMode, LightEntity, LightEntityDescription
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, LIGHTABLE_FAMILY, MieleAppliance
+from .const import LIGHTABLE_FAMILY
 from .coordinator import MieleLanCoordinator
 from .entity import MieleLanEntity
+from .runtime import MieleLanConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: MieleLanConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    bundle = hass.data[DOMAIN][entry.entry_id]
-    coordinators: dict[str, MieleLanCoordinator] = bundle["coordinators"]
+    coordinators = entry.runtime_data.coordinators
     entities: list[Any] = []
     for coord in coordinators.values():
         if coord.device_type in LIGHTABLE_FAMILY and "Light" in coord.data.state:

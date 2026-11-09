@@ -18,7 +18,6 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     REVOLUTIONS_PER_MINUTE,
     EntityCategory,
@@ -39,7 +38,6 @@ from .const import (
     COOLING_FAMILY,
     CYCLE_FAMILY,
     DISHWASHER_FAMILY,
-    DOMAIN,
     HOB_FAMILY,
     LAUNDRY_FAMILY,
     TWINDOS_FAMILY,
@@ -55,6 +53,7 @@ from .const import (
 from .coordinator import MieleLanCoordinator
 from .dop2 import dos_container_field
 from .entity import MieleLanEntity
+from .runtime import MieleLanConfigEntry
 
 
 # Per-device-type ProgramID and ProgramPhase tables.  Keyed by MieleAppliance.
@@ -1031,11 +1030,10 @@ def _present_temperature_zones(coord: MieleLanCoordinator) -> set[int]:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: MieleLanConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    bundle = hass.data[DOMAIN][entry.entry_id]
-    coordinators: dict[str, MieleLanCoordinator] = bundle["coordinators"]
+    coordinators = entry.runtime_data.coordinators
     entities: list[Any] = []
     for coord in coordinators.values():
         dt = coord.device_type

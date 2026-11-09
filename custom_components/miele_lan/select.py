@@ -10,13 +10,13 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, RUN_ON_TIME_MINUTES
+from .const import RUN_ON_TIME_MINUTES
 from .coordinator import MieleLanCoordinator
 from .entity import MieleLanEntity
+from .runtime import MieleLanConfigEntry
 
 # "off" plus one option per nonzero run-on time, e.g. "5_min", "15_min".
 RUN_ON_OPTIONS: dict[str, int] = {
@@ -26,11 +26,10 @@ RUN_ON_OPTIONS: dict[str, int] = {
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: MieleLanConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    bundle = hass.data[DOMAIN][entry.entry_id]
-    coordinators: dict[str, MieleLanCoordinator] = bundle["coordinators"]
+    coordinators = entry.runtime_data.coordinators
     entities: list[Any] = []
     for coord in coordinators.values():
         if coord.hood_dop1_supported:

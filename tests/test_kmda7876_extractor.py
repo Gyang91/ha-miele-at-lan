@@ -11,6 +11,7 @@ from homeassistant.helpers import frame
 from custom_components.miele_lan import fan, sensor
 from custom_components.miele_lan.const import DOMAIN, MieleAppliance
 from custom_components.miele_lan.coordinator import MieleLanCoordinator, MieleLanData
+from custom_components.miele_lan.runtime import MieleLanRuntimeData
 from custom_components.miele_lan.extended_state import parse_kmda7876_extractor_speed
 
 SAMPLES = json.loads(
@@ -50,10 +51,17 @@ def make_coordinator(tmp_path, monkeypatch):
             state={"Status": 1, "ExtendedState": SAMPLES[0]["ExtendedState"]},
         )
         coord.data = coord._data
-        hass.data[DOMAIN] = {"test": {"coordinators": {"hob": coord}}}
         return hass, coord
 
     return make
+
+
+def _entry(coord):
+    """A loaded config entry whose runtime data holds `coord`."""
+    return SimpleNamespace(
+        entry_id="test",
+        runtime_data=MieleLanRuntimeData(coordinators={coord.fab: coord}),
+    )
 
 
 @pytest.mark.asyncio
@@ -69,7 +77,7 @@ def make_coordinator(tmp_path, monkeypatch):
 async def test_real_entity_selection(make_coordinator, model, device_type, expected, platform, key):
     hass, coord = make_coordinator(model, device_type)
     entities = []
-    await platform.async_setup_entry(hass, SimpleNamespace(entry_id="test"), entities.extend)
+    await platform.async_setup_entry(hass, _entry(coord), entities.extend)
     extractors = [e for e in entities if e.unique_id == f"test-hob_{key}"]
     assert len(extractors) == int(expected)
     if expected:
@@ -160,7 +168,7 @@ async def test_hood_keeps_existing_controllable_fan(make_coordinator):
     coord._data.ident["protocol_version"] = 2
     coord.data.state["VentilationStep"] = 2
     entities = []
-    await fan.async_setup_entry(hass, SimpleNamespace(entry_id="test"), entities.extend)
+    await fan.async_setup_entry(hass, _entry(coord), entities.extend)
     assert len(entities) == 1
     assert isinstance(entities[0], fan.MieleLanFan)
     assert entities[0].preset_mode == "2"

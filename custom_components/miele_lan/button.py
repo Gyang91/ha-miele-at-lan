@@ -23,13 +23,11 @@ from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     DISHWASHER_FAMILY,
-    DOMAIN,
     OPCODE_STOP,
     OVEN_FAMILY,
     PROCESS_ACTION_PAUSE,
@@ -41,6 +39,7 @@ from .const import (
 )
 from .coordinator import MieleLanCoordinator
 from .entity import MieleLanEntity
+from .runtime import MieleLanConfigEntry
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -118,11 +117,10 @@ BUTTONS: tuple[MieleLanButtonDef, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: MieleLanConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    bundle = hass.data[DOMAIN][entry.entry_id]
-    coordinators: dict[str, MieleLanCoordinator] = bundle["coordinators"]
+    coordinators = entry.runtime_data.coordinators
     entities = []
     for coord in coordinators.values():
         dt = coord.device_type

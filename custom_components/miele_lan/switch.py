@@ -27,19 +27,18 @@ from homeassistant.components.switch import (
     SwitchEntity,
     SwitchEntityDescription,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .api import MieleLanClient
 from .const import (
-    DOMAIN,
     POWERABLE_FAMILY,
     MieleAppliance,
     wants_power_switch,
 )
 from .coordinator import MieleLanCoordinator
 from .entity import MieleLanEntity
+from .runtime import MieleLanConfigEntry
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -73,11 +72,10 @@ SWITCH_TYPES: tuple[MieleLanSwitchDef, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: MieleLanConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    bundle = hass.data[DOMAIN][entry.entry_id]
-    coordinators: dict[str, MieleLanCoordinator] = bundle["coordinators"]
+    coordinators = entry.runtime_data.coordinators
     entities = []
     for coord in coordinators.values():
         dt = coord.device_type

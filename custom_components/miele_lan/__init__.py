@@ -19,7 +19,7 @@ from typing import Any
 import aiohttp
 from homeassistant.components import zeroconf as ha_zeroconf
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, Platform
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import issue_registry as ir
@@ -36,7 +36,6 @@ from .const import (
     CONF_HA_PORT,
     CONF_REFRESH_TOKEN,
     CONF_STATIC_IPS,
-    CONF_ROUTE,
     DEFAULT_HA_PUSH_PORT,
     DOMAIN,
 )
@@ -54,8 +53,8 @@ from .push_listener import (
     PushEvent,
     detect_lan_ip,
     resolve_advertise_ip,
-    synthetic_mac_hostname,
 )
+from .runtime import MieleLanConfigEntry, MieleLanRuntimeData
 from .services import async_remove_services, async_setup_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -71,7 +70,7 @@ PLATFORMS: list[Platform] = [
 ]
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: MieleLanConfigEntry) -> bool:
     """Set up Miele@LAN from a config entry. Both flow kinds (cloud OAuth and
     direct-keys with mDNS discovery) share the same runtime — one household
     entry, multi-device, push-first."""
@@ -126,7 +125,7 @@ def _push_unmatched_fab_action(
     return "unknown", logging.WARNING
 
 
-async def _setup_cloud(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def _setup_cloud(hass: HomeAssistant, entry: MieleLanConfigEntry) -> bool:
     """Cloud-pair path: household key already extracted, enrol every device,
     start the push listener, spawn one coordinator per device."""
     group_id: str = entry.data[CONF_GROUP_ID]
@@ -159,14 +158,7 @@ async def _setup_cloud(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "configured via advertise address option" if advertise_is_configured else "auto-detected",
     )
 
-    bundle: dict[str, Any] = {
-        "kind": "cloud",
-        "coordinators": {},
-        "listener": None,
-        "ha_fab": ha_fab,
-        "clients": [],
-        "setup_complete": False,
-    }
+    runtime = MieleLanRuntimeData()
 
     # Grab HA's shared zeroconf so we don't create competing instances.
     shared_zc = await ha_zeroconf.async_get_async_instance(hass)
@@ -241,11 +233,11 @@ async def _setup_cloud(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     expected_fabs.discard(None)
 
     async def _on_push(event: PushEvent) -> None:
-        coords = bundle["coordinators"]
+        coords = runtime.coordinators
         coord = coords.get(event.peer_fab)
         if coord is None:
             action, level = _push_unmatched_fab_action(
-                expected_fabs, bundle["setup_complete"], event.peer_fab,
+                expected_fabs, runtime.setup_complete, event.peer_fab,
             )
             if action == "setup_in_progress":
                 _LOGGER.log(
@@ -272,6 +264,7 @@ async def _setup_cloud(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         on_push=_on_push,
         zeroconf=shared_zc,
     )
+    runtime.listener = listener
     try:
         await listener.start()
     except OSError as err:
@@ -280,20 +273,20 @@ async def _setup_cloud(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "(reconfigure the entry with a different ha_port)",
             ha_port, err,
         )
+        await runtime.async_close()
         return False
     except Exception as err:
         # NotRunningException from zeroconf, or any other startup fault —
         # release whatever the listener already grabbed and ask HA to retry.
         # Without this, the leaked mDNS registration / bound port poisons the
         # next setup attempt (issue #2).
-        await _safe_stop_listener(listener)
+        await runtime.async_close()
         from zeroconf import NotRunningException  # local import — optional dep
         if isinstance(err, NotRunningException):
             raise ConfigEntryNotReady(
                 "HA's shared zeroconf is not running yet — retrying setup"
             ) from err
         raise
-    bundle["listener"] = listener
 
     resolver = DeviceIpResolver(static=merged_static_ips, zeroconf=shared_zc)
     try:
@@ -307,7 +300,7 @@ async def _setup_cloud(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             resolver=resolver,
         )
     except Exception:
-        await _safe_stop_listener(listener)
+        await runtime.async_close()
         raise
     enrolled = enrollment_result.enrolled
 
@@ -336,22 +329,19 @@ async def _setup_cloud(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 route=ed.fab,
             )
             await client.__aenter__()
-            bundle["clients"].append(client)
+            runtime.clients.append(client)
             coord = MieleLanCoordinator(hass, entry, client, fab=ed.fab, enrollment=ed)
             await coord.async_config_entry_first_refresh()
-            bundle["coordinators"][ed.fab] = coord
+            runtime.coordinators[ed.fab] = coord
     except Exception:
         # Any failure here would otherwise leak the listener and all
         # already-opened clients — see issue #2's NotRunningException loop.
-        await _safe_stop_listener(listener)
-        for client in bundle.get("clients", []):
-            try: await client.__aexit__(None, None, None)
-            except Exception: pass
+        await runtime.async_close()
         raise
 
-    bundle["setup_complete"] = True
+    runtime.setup_complete = True
 
-    if not bundle["coordinators"]:
+    if not runtime.coordinators:
         # No device reachable on the LAN yet. This is recoverable: an
         # appliance might be powered off, mDNS might be slow to populate,
         # multicast might be temporarily broken. Tear down what we started
@@ -359,10 +349,7 @@ async def _setup_cloud(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # then raise ConfigEntryNotReady so HA retries on its standard
         # backoff schedule. Users with permanently broken multicast can
         # configure static IPs via the options flow.
-        await _safe_stop_listener(listener)
-        for client in bundle.get("clients", []):
-            try: await client.__aexit__(None, None, None)
-            except Exception: pass
+        await runtime.async_close()
         raise ConfigEntryNotReady(
             "no Miele devices reachable on the LAN yet — will retry. "
             "Configure static IPs in the integration's options if your "
@@ -371,7 +358,7 @@ async def _setup_cloud(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     issue_id = f"unenrolled_devices_{entry.entry_id}"
     failed = enrollment_result.failed
-    line = summary_line(len(bundle["coordinators"]), failed)
+    line = summary_line(len(runtime.coordinators), failed)
     if failed:
         _LOGGER.warning(line)
         ir.async_create_issue(
@@ -387,18 +374,19 @@ async def _setup_cloud(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.info(line)
         ir.async_delete_issue(hass, DOMAIN, issue_id)
 
+    # Both are released by Home Assistant itself when the entry unloads: an
+    # entry background task is cancelled, and async_on_unload runs the unsub.
     if entry.data.get(CONF_REFRESH_TOKEN):
-        bundle["token_refresh_task"] = entry.async_create_background_task(
+        entry.async_create_background_task(
             hass, _token_refresh_loop(hass, entry), name=f"{DOMAIN}_token_refresh"
         )
-
-    bundle["options_unsub"] = entry.add_update_listener(_async_options_updated)
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = bundle
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+    entry.runtime_data = runtime
     # Entities gated on ident fields (hood fan, hood filters, extractor speed)
     # are created once below and won't reappear until a reload — give a
     # transient first-refresh /Ident failure a bounded chance to heal first.
     await asyncio.gather(
-        *(coord.async_ensure_ident_ready() for coord in bundle["coordinators"].values())
+        *(coord.async_ensure_ident_ready() for coord in runtime.coordinators.values())
     )
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
@@ -407,19 +395,6 @@ async def _setup_cloud(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Options flow changed the static-IP map — reload so it takes effect."""
     await hass.config_entries.async_reload(entry.entry_id)
-
-
-async def _safe_stop_listener(listener: MielePushListener) -> None:
-    """Best-effort listener cleanup used by every failure path in _setup_cloud.
-
-    A half-started listener still holds an mDNS registration + a bound port —
-    if we leave it alive across a failed setup, HA's retry will collide with
-    those and trip NotRunningException / OSError (issue #2).
-    """
-    try:
-        await listener.stop()
-    except Exception as err:  # noqa: BLE001
-        _LOGGER.debug("listener stop on abort failed (ignored): %s", err)
 
 
 async def _token_refresh_loop(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -444,29 +419,13 @@ async def _token_refresh_loop(hass: HomeAssistant, entry: ConfigEntry) -> None:
             _LOGGER.debug("refresh token rotated")
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: MieleLanConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if not unload_ok:
         return False
     async_remove_services(hass)
-    bundle = hass.data[DOMAIN].pop(entry.entry_id, None)
-    if bundle is None:
-        return True
-    options_unsub = bundle.get("options_unsub")
-    if options_unsub is not None:
-        options_unsub()
-    task = bundle.get("token_refresh_task")
-    if task is not None:
-        task.cancel()
-    listener = bundle.get("listener")
-    if listener is not None:
-        await listener.stop()
-    for client in bundle.get("clients", []):
-        try:
-            await client.__aexit__(None, None, None)
-        except Exception:
-            _LOGGER.debug("client close raised — ignoring during unload")
+    await entry.runtime_data.async_close()
     return True
 
 

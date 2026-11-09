@@ -138,14 +138,16 @@ def test_rest_resource_schema_accepts_known_resource() -> None:
 def test_resolve_coordinator_finds_fab_across_loaded_entries() -> None:
     from types import SimpleNamespace
 
-    from custom_components.miele_lan.const import DOMAIN
     from custom_components.miele_lan.services import _resolve_coordinator
 
     coord = object()
-    hass = SimpleNamespace(data={DOMAIN: {
-        "entry_a": {"coordinators": {"000000000001": object()}},
-        "entry_b": {"coordinators": {"000000000002": coord}},
-    }})
+    entries = [
+        SimpleNamespace(runtime_data=SimpleNamespace(coordinators={"000000000001": object()})),
+        SimpleNamespace(runtime_data=SimpleNamespace(coordinators={"000000000002": coord})),
+    ]
+    hass = SimpleNamespace(
+        config_entries=SimpleNamespace(async_loaded_entries=lambda domain: entries)
+    )
     assert _resolve_coordinator(hass, "000000000002") is coord
 
 
@@ -157,4 +159,9 @@ def test_resolve_coordinator_raises_when_fab_not_loaded() -> None:
     from custom_components.miele_lan.services import _resolve_coordinator
 
     with pytest.raises(HomeAssistantError):
-        _resolve_coordinator(SimpleNamespace(data={}), "000000000002")
+        _resolve_coordinator(
+            SimpleNamespace(
+                config_entries=SimpleNamespace(async_loaded_entries=lambda domain: [])
+            ),
+            "000000000002",
+        )

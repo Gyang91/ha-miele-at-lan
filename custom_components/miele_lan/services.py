@@ -75,8 +75,8 @@ def _resolve_coordinator(hass: HomeAssistant, fab: str) -> Any:
     # Looked up by fab across loaded entries rather than via the device's
     # config entries: DeviceEntry.config_entries is deprecated (HA 2026.10)
     # and its replacement config_entry_id does not exist on older releases.
-    for bundle in hass.data.get(DOMAIN, {}).values():
-        coordinator = bundle.get("coordinators", {}).get(fab)
+    for entry in hass.config_entries.async_loaded_entries(DOMAIN):
+        coordinator = entry.runtime_data.coordinators.get(fab)
         if coordinator is not None:
             return coordinator
     raise HomeAssistantError(

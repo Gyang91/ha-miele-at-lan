@@ -25,13 +25,12 @@ from homeassistant.components.fan import (
     FanEntityDescription,
     FanEntityFeature,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
 from .coordinator import MieleLanCoordinator
 from .entity import MieleLanEntity
+from .runtime import MieleLanConfigEntry
 from .extended_state import EXTRACTOR_SPEED_LABELS, parse_kmda7876_extractor_speed
 
 # Luefterstufe -> preset label. Step 4 is labeled "Boost" on the appliance,
@@ -48,11 +47,10 @@ EXTRACTOR_PERCENTAGES = {
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: MieleLanConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    bundle = hass.data[DOMAIN][entry.entry_id]
-    coordinators: dict[str, MieleLanCoordinator] = bundle["coordinators"]
+    coordinators = entry.runtime_data.coordinators
     entities: list[Any] = []
     for coord in coordinators.values():
         state = coord.data.state if coord.data else {}
