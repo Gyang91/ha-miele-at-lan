@@ -24,7 +24,8 @@
 > with one fix: background polling no longer wakes washers, dryers and dishwashers
 > (`PUT /State {"DeviceAction": 2}` every 10 minutes kept them out of standby, e.g. a
 > dryer's drum light switching on at night). The domain stays `miele_lan`, so it
-> replaces the original in place. See [CHANGELOG.md](CHANGELOG.md).
+> replaces the original in place. Versions carry a `-fork.N` suffix; see
+> [CHANGELOG.md](CHANGELOG.md) and [Fork changes](#fork-changes).
 
 Local Home Assistant integration for Miele@home appliances — ovens, hobs, dishwashers, washers, dryers, fridges, freezers, hoods, coffee systems, dish warmers, wine cabinets. Talks directly to the appliance over the LAN. No cloud account is required to run, no sidecar server, no Miele 3rd-party API.
 
@@ -179,6 +180,43 @@ python -m pytest tests/
 ```
 
 Parser/protocol tests have no HA imports — they run on plain Python.
+
+## Fork changes
+
+### No background wake (1.17.1-fork.1, based on upstream v1.17.1 / `d1fd482`)
+
+The device-context read (DOP2 `2/1585`: TwinDos, Wash2Dry, salt/rinse aid,
+AutoDos) ran every 10 minutes for washers, dryers and dishwashers. On HTTP 500
+(XKM asleep) it sent `PUT /State {"DeviceAction": 2}` and read again. When the
+wake worked, the miss counter reset, so the appliance was woken every 10
+minutes, day and night. On a dryer this shows as the drum light switching on
+while the machine is off.
+
+Now `_maybe_refresh_device_context`:
+
+- never calls `wake()`;
+- skips the read while `/State.Status` is off (1) or not_connected (255); the
+  throttle is not advanced, so the read happens on the first poll after the
+  appliance is switched on;
+- treats a 500 or a fetch failure as "asleep" unless a programme runs (Status
+  in_use): the last value is kept, no miss is counted, and a sleeping appliance
+  is never latched unsupported (G7655 case);
+- counts a 500 or a fetch failure as a miss while a programme runs; 3
+  consecutive misses latch the leaf unsupported as before (issue #16, G7310).
+  403/404 still latch at once.
+
+Waking after a user action is unchanged: the wake button and the power switch
+still wake the appliance. Trade-off: consumable levels refresh only while the
+appliance is on. The 60 s `/State` poll is unchanged; whether that request
+alone wakes an appliance is not known.
+
+### Releases
+
+Releases are cut by [release-please](https://github.com/googleapis/release-please)
+from conventional commits: `feat:`, `fix:` and `perf:` release, `chore:`,
+`ci:`, `docs:` and `test:` do not. The release workflow tests, merges and tags
+its own release pull request, so a release needs no manual step. HACS installs
+from the tag.
 
 ## Disclaimer
 
