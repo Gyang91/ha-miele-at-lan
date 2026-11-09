@@ -15,6 +15,10 @@ jobs:
   hacs:
     name: HACS
     runs-on: ubuntu-latest
+    # Not on pull requests: HACS validates the repository on GitHub, and the
+    # release workflow deletes its pull request branch right after merging,
+    # so that run could only fail.
+    if: ${{ github.event_name != 'pull_request' }}
     steps:
       - uses: actions/checkout@v7
       - name: HACS validation

@@ -11,9 +11,3 @@
 ### Miscellaneous
 
 * Release 1.17.1-fork.1 ([66c0f72](https://github.com/Gyang91/ha-miele-at-lan/commit/66c0f721be74a9a0cb43d805451c912783d7340c))
-
-## Changelog
-
-Releases of this fork. Entries are written by release-please from the commit
-messages. Upstream releases are listed on
-[tiehfood/ha-miele-at-lan](https://github.com/tiehfood/ha-miele-at-lan/releases).
