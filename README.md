@@ -5,9 +5,6 @@
 <h1 align="center">Miele@LAN</h1>
 
 <p align="center">
-  <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=Gyang91&repository=ha-miele-at-lan&category=integration"><img alt="Open in HACS" src="https://my.home-assistant.io/badges/hacs_repository.svg"/></a>
-</p>
-<p align="center">
   <a href="https://github.com/Gyang91/ha-miele-at-lan/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Gyang91/ha-miele-at-lan?label=release"/></a>
   <a href="https://github.com/Gyang91/ha-miele-at-lan/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Gyang91/ha-miele-at-lan/actions/workflows/ci.yml/badge.svg"/></a>
   <a href="https://github.com/Gyang91/ha-miele-at-lan/actions/workflows/validate.yml"><img alt="Validate" src="https://github.com/Gyang91/ha-miele-at-lan/actions/workflows/validate.yml/badge.svg"/></a>
