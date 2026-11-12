@@ -1,10 +1,13 @@
-# Gitleaks: default rules, plus one allowlist for Home Assistant entity
-# descriptions. `key="twindos_1_empty"` and `translation_key="..."` name an
-# entity, they are not secrets, but the generic-api-key rule flags them.
 [extend]
 useDefault = true
 
-[[allowlists]]
-description = "Home Assistant entity description keys"
-regexTarget = "match"
-regexes = ['''(?:translation_)?key="[a-z0-9_]+"''']
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "TwinDos entity identifiers in historical commit"
+condition = "AND"
+commits = ["39444c5cbb7be1446ba7d5cda362e3fd0cf0663b"]
+paths = ['''^custom_components/miele_lan/binary_sensor\.py$''']
+regexTarget = "line"
+regexes = ['''(?:translation_)?key="twindos_[12]_empty"''']
