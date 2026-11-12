@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.1](https://github.com/Gyang91/ha-miele-at-lan/compare/v1.20.0...v1.20.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* scope Gitleaks exception to historical false positives ([f98417c](https://github.com/Gyang91/ha-miele-at-lan/commit/f98417ca91db48b4e2a5de8486e315dc7b0788fb))
+
 ## [1.20.0](https://github.com/Gyang91/ha-miele-at-lan/compare/v1.19.0...v1.20.0) (2026-11-09)
 
 
