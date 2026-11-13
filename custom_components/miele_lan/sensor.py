@@ -1162,19 +1162,8 @@ async def async_setup_entry(
         for d in WLAN_SENSORS:
             if dt in d.types:
                 entities.append(MieleLanWlanSensor(coord, d.description))
-        for d in DOP2_SENSORS:
-            if dt not in d.types:
-                continue
-            rdk = d.description.required_dop2_key
-            # `hours_of_operation_supported` tracks one specific DOP2 leaf
-            # (2/119) and says nothing about the other entries here — the hood
-            # filter grades don't even come from DOP2 (see coordinator.py) —
-            # so only the sensor fed by that leaf is gated on it.
-            if rdk == "hours_of_operation" and not coord.hours_of_operation_supported:
-                continue
-            if rdk is not None and rdk not in coord.data.dop2:
-                continue
-            entities.append(MieleLanDop2Sensor(coord, d.description))
+        if any(dt in d.types for d in DOP2_SENSORS):
+            add_entities_when_ready(entry, coord, _dop2_sensors, async_add_entities)
         if any(dt in d.types for d in DEVICE_CONTEXT_SENSORS):
             add_entities_when_ready(
                 entry, coord, _device_context_sensors, async_add_entities
@@ -1182,6 +1171,30 @@ async def async_setup_entry(
         # Diagnostic push-mode sensor — applies to every appliance.
         entities.append(MieleLanPushStateSensor(coord))
     async_add_entities(entities)
+
+
+def _dop2_sensors(coord: MieleLanCoordinator) -> list[SensorEntity]:
+    """Sensors fed by slow DOP2 reads, for the leaves that have answered so far.
+
+    Those leaves are read on a slow cadence and only while the appliance is
+    awake, so their data can first show up long after platform setup.
+    """
+    dop2 = coord.data.dop2 if coord.data else {}
+    entities: list[SensorEntity] = []
+    for d in DOP2_SENSORS:
+        if coord.device_type not in d.types:
+            continue
+        rdk = d.description.required_dop2_key
+        # `hours_of_operation_supported` tracks one specific DOP2 leaf
+        # (2/119) and says nothing about the other entries here — the hood
+        # filter grades don't even come from DOP2 (see coordinator.py) —
+        # so only the sensor fed by that leaf is gated on it.
+        if rdk == "hours_of_operation" and not coord.hours_of_operation_supported:
+            continue
+        if rdk is not None and rdk not in dop2:
+            continue
+        entities.append(MieleLanDop2Sensor(coord, d.description))
+    return entities
 
 
 def _device_context_sensors(coord: MieleLanCoordinator) -> list[SensorEntity]:

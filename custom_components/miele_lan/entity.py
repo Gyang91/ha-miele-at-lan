@@ -21,35 +21,26 @@ def add_entities_when_ready(
     build: Callable[[MieleLanCoordinator], Sequence[Entity]],
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Add data-dependent entities now, or once the data first arrives.
+    """Add data-dependent entities now, and each one later once its data arrives.
 
-    Which DOP2 2/1585 entities exist depends on what the leaf reports (for
-    example how many dosing containers). An appliance asleep when Home
-    Assistant starts has not answered yet; instead of waking it, wait for
-    its first answer and add the entities then, exactly once.
+    Which DOP2 entities exist depends on what the appliance reports (for
+    example how many dosing containers, or whether a 2/1585 counter is
+    filled). An appliance asleep when Home Assistant starts has not answered
+    yet, and a later answer can carry fields the first one lacked. Instead
+    of waking it, re-run `build` on every coordinator update and add each
+    entity the first time it shows up, never twice.
     """
-    entities = build(coordinator)
-    if entities:
-        async_add_entities(entities)
-        return
-    listening = True
+    created: set[str | None] = set()
 
     @callback
-    def _stop_listening() -> None:
-        nonlocal listening
-        if listening:
-            listening = False
-            remove_listener()
+    def _add_new() -> None:
+        new = [e for e in build(coordinator) if e.unique_id not in created]
+        if new:
+            created.update(e.unique_id for e in new)
+            async_add_entities(new)
 
-    @callback
-    def _on_update() -> None:
-        late = build(coordinator)
-        if late:
-            _stop_listening()
-            async_add_entities(late)
-
-    remove_listener = coordinator.async_add_listener(_on_update)
-    entry.async_on_unload(_stop_listening)
+    _add_new()
+    entry.async_on_unload(coordinator.async_add_listener(_add_new))
 
 
 # Human-readable model labels per device type. Used as DeviceInfo.model so
