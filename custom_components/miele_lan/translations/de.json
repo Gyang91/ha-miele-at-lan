@@ -937,6 +937,12 @@
       "start_in_minutes": {
         "name": "Start in"
       },
+      "progress": {
+        "name": "Fortschritt"
+      },
+      "finish_time": {
+        "name": "Endzeit"
+      },
       "cavity_temperature": {
         "name": "Garraumtemperatur"
       },
