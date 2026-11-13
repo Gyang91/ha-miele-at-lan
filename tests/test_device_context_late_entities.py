@@ -74,7 +74,8 @@ def test_added_immediately_when_context_present() -> None:
     add_entities_when_ready(entry, coord, sensor._device_context_sensors, added.append)
     assert "wash2dry_state" in _keys(added)
     assert "twindos_2_level" in _keys(added)
-    assert coord.listeners == []
+    coord.fire()
+    assert len(added) == 1  # still listening, but nothing added twice
 
 
 def test_added_once_when_first_answer_arrives_later() -> None:
@@ -87,7 +88,6 @@ def test_added_once_when_first_answer_arrives_later() -> None:
     coord.data.device_context = dict(CONTEXT)
     coord.fire()
     assert _keys(added) == {"wash2dry_state"}  # dryer: no TwinDos
-    assert coord.listeners == []
 
     coord.fire()
     assert len(added) == 1  # never added twice
@@ -102,6 +102,31 @@ def test_binary_sensors_follow_the_same_path() -> None:
     coord.data.device_context = dict(CONTEXT)
     coord.fire()
     assert _keys(added) == {"twindos_1_empty", "twindos_2_empty"}
+
+
+def test_field_missing_from_the_first_answer_is_added_later() -> None:
+    coord, entry, added = _Coord(MieleAppliance.TUMBLE_DRYER, CONTEXT), _Entry(), []
+    add_entities_when_ready(entry, coord, sensor._device_context_sensors, added.append)
+    assert "lifetime_energy" not in _keys(added)
+
+    coord.data.device_context = {**CONTEXT, "lifetime_energy_wh": 123456}
+    coord.fire()
+    assert len(added) == 2
+    assert {e.entity_description.key for e in added[1]} == {"lifetime_energy"}
+
+
+def test_dop2_sensor_appears_when_its_leaf_first_answers() -> None:
+    coord, entry, added = _Coord(MieleAppliance.OVEN), _Entry(), []
+    coord.data.dop2 = {}
+    coord.hours_of_operation_supported = True
+    add_entities_when_ready(entry, coord, sensor._dop2_sensors, added.append)
+    assert "hours_of_operation" not in _keys(added)
+
+    coord.data.dop2 = {"hours_of_operation": 42}
+    coord.fire()
+    assert "hours_of_operation" in _keys(added)
+    coord.fire()
+    assert [e.entity_description.key for b in added for e in b].count("hours_of_operation") == 1
 
 
 def test_unload_removes_a_waiting_listener_exactly_once() -> None:
