@@ -31,11 +31,11 @@ Fork of [tiehfood/ha-miele-at-lan](https://github.com/tiehfood/ha-miele-at-lan).
 
 | Family | Models | Sensors | Controls |
 |---|---|---|---|
-| **Oven** (incl. steam, combi, microwave) | H7560BP, H7164BP, DGC7860HCXL, DGM7440, … | status, program, phase, remaining/elapsed/start-in, program start/end time, cavity & core temps, target & core-target, door, signals, light | stop, wake, power, light |
+| **Oven** (incl. steam, combi, microwave) | H7560BP, H7164BP, DGC7860HCXL, DGM7440, … | status, program, phase, remaining/elapsed/start-in, program start/end time, progress, finish time, cavity & core temps, target & core-target, door, signals, light | stop, wake, power, light |
 | **Hob** | KM7576, KM7895 FL induction, induction + extractor | per-zone power (1..12 incl. ½ steps, boost/boost+, keep-warm), residual heat, timer, status | — |
-| **Dishwasher** | G7000 series, semi-pro/professional | status, program, phase, remaining/elapsed/start-in, program start/end time, door, signals, AutoDos, salt, rinse aid, lifetime energy & water ¹ | start / stop / pause / resume, wake, power |
-| **Washing machine** | WWG/WWV/WWI/WTV series | status, program, phase, spin speed, target temp, remaining/elapsed/start-in, program start/end time, door, signals, Smart Grid, TwinDos levels & Wash2Dry ¹ | start / stop, wake |
-| **Tumble dryer** | TWC/TWV/TMV series | status, program, phase, drying step, remaining/elapsed/start-in, program start/end time, door, signals, Smart Grid, Wash2Dry, energy per program & lifetime ¹ | start / stop, wake, power ² |
+| **Dishwasher** | G7000 series, semi-pro/professional | status, program, phase, remaining/elapsed/start-in, program start/end time, progress, finish time, door, signals, AutoDos, salt, rinse aid, lifetime energy & water ¹ | start / stop / pause / resume, wake, power |
+| **Washing machine** | WWG/WWV/WWI/WTV series | status, program, phase, spin speed, target temp, remaining/elapsed/start-in, program start/end time, progress, finish time, door, signals, Smart Grid, TwinDos levels & Wash2Dry ¹ | start / stop, wake |
+| **Tumble dryer** | TWC/TWV/TMV series | status, program, phase, drying step, remaining/elapsed/start-in, program start/end time, progress, finish time, door, signals, Smart Grid, Wash2Dry, energy per program & lifetime ¹ | start / stop, wake, power ² |
 | **Fridge / freezer / fridge-freezer** | KF 7772 B, K 7000, KFN, KFNS, … | per-zone current & target temp, per-zone door, SuperCool, SuperFreeze, failure | — (see [Limitations](#limitations)) |
 | **Wine cabinet** | KWT 6000, KWNS, KWTUS, wine + freezer | per-zone temp, per-zone door, light state | — (see [Limitations](#limitations)) |
 | **Hood / range vent** | DA series, EK039W | fan step, light state, grease & charcoal filter saturation ³ | fan (off / 1-3 / boost) ³, fan run-on time ³, light, power ⁴ |
@@ -75,7 +75,7 @@ Copy `custom_components/miele_lan/` to `<config>/custom_components/miele_lan/` a
 - **Paste pre-obtained tokens.** An `access_token` + `refresh_token` from a Miele OAuth flow against `prod.map.miele-iot.com`.
 - **Paste household credentials.** `GroupID` + `GroupKey` (e.g. from `MieleRESTServer`). No cloud round-trip; works for every country.
 
-Factory-fresh appliances: run `python tools/miele_lan_provision.py` first. It writes a new `GroupID`/`GroupKey` and binds the appliance to your LAN.
+Factory-fresh appliances: run `python tools/miele_lan_provision.py` first. It writes a new `GroupID`/`GroupKey` and binds the appliance to your LAN. The keys are saved to `keys.yaml` in the repository root, which git ignores; pass `--out` (or `--keys` for `verify`) to use another file.
 
 > **Warning:** the appliance does not validate commissioning payloads. An empty `GroupKey` or a `GroupID` of `0` is accepted with `200 OK`; every later write of the real keys is then refused with `403 Forbidden`. Recovery only on the appliance: settings → **Miele@home** → reset, then reconnect in the Miele app. Use `tools/miele_lan_provision.py`, which validates key lengths.
 
@@ -164,7 +164,7 @@ Start needs remote control enabled on the appliance, and is refused while mobile
 - **Fridges, freezers and wine cabinets are read-only.** K7000/EasyControl firmware (XKM `EK057*`) has no LAN write path; every PUT/POST returns HTTP 403 (verified on a KF 7772 B). The Miele app writes via a device-initiated cloud WebSocket. [Miele's documentation](https://www.miele.de/support/customer-assistance/app-1199/alle_kategorien/mobilecontrol_und_mobilestart-132299522827): MobileStart is permanently on and not togglable on cooling appliances. State changes still arrive in real time via push.
 - **Washers with an EK057 module (firmware 08.x)** expose no DOP2 at all (no `DOP2` resource, every leaf 404). Without DOP2: no TwinDos levels, no energy/water, no Wash2Dry, no power switch. Over `/State` they accept `{"DeviceAction": 2}` but stay off, and refuse `{"DeviceAction": 3}` with HTTP 400. Tested on a WWI860.
 - **Energy and water** need DOP2 `2/1585` or a model-specific `/State.ExtendedState`.
-- **No program selection.** Start only runs the program chosen on the panel.
+- **No reliable program selection.** Start runs the program chosen on the panel. The experimental `miele_lan.select_program` service (**Select programme (experimental)**) writes a program number to DOP2 `2/1577`, the way the Miele app does, but never starts it. It returns the HTTP status and the leaf before and after, so you can see whether your appliance accepts it.
 - **No firmware update trigger.** `/Update/` is read-only.
 - **`Mobile Controllable`** must be enabled on the panel for writes to cycle appliances (oven, dishwasher, washer, dryer).
 - **One household per HA install.**
@@ -187,7 +187,7 @@ Nothing listed: the network drops multicast. Usual causes: IGMP snooping without
 
 **One appliance missing.** The integration raises a **repair issue** naming it. Usually the appliance was never fully commissioned: its mDNS TXT record shows `group=` with nothing after it (compare with a working appliance using the commands above). Fix: appliance settings → **Miele@home** → reset, then reconnect in the Miele app.
 
-**Push not working (updates only every 60 s).** Enable `Mobile Controllable` on the appliance; make sure HA's listener port (default 18082) is reachable from the appliance subnet. The diagnostic **Push status** sensor shows `push:active` when push works.
+**Push not working (updates only every 60 s).** Enable `Mobile Controllable` on the appliance; make sure HA's listener port (default 18082) is reachable from the appliance subnet. The diagnostic **Push status** sensor shows **Push active** (state `push_active`) when push works. The other states: **Push ready, no update yet** (`push_ready`), **Basic push, no update yet** (`subs_ready`, normal for some models), **Polling only** (`polling`).
 
 **`HTTP error 403` on writes.** `Mobile Controllable` is off on the panel. Cooling appliances always answer 403 (see [Limitations](#limitations)).
 
@@ -200,7 +200,7 @@ logger:
     asyncmiele: debug
 ```
 
-**Raw data for bug reports.** Services `miele_lan.dump_dop2_leaf` and `miele_lan.dump_rest_resource` read one DOP2 leaf or REST resource and return it (read-only).
+**Raw data for bug reports.** Services `miele_lan.dump_dop2_leaf` (**Dump DOP2 leaf**) and `miele_lan.dump_rest_resource` (**Dump REST resource**) read one DOP2 leaf or REST resource and return it (read-only).
 
 ## Development
 
@@ -216,7 +216,7 @@ Parser and protocol tests need no running Home Assistant.
 
 ## Fork changes
 
-Differences from upstream [tiehfood/ha-miele-at-lan](https://github.com/tiehfood/ha-miele-at-lan) v1.17.1:
+Differences from upstream [tiehfood/ha-miele-at-lan](https://github.com/tiehfood/ha-miele-at-lan). The fork branched at v1.17.1 and takes upstream changes by cherry-pick, not merge; the upstream fixes that apply to this fork, up to v1.24.1, are included.
 
 | Area | Change |
 |---|---|
@@ -225,9 +225,9 @@ Differences from upstream [tiehfood/ha-miele-at-lan](https://github.com/tiehfood
 | Entities | DOP2 `2/1585` entities appear once the leaf first answers, not only at setup. TwinDos entities only on washers. |
 | New sensors | Program start / end time (all cycle appliances), Smart Grid, energy and water per program and lifetime. |
 | New controls | Power switch for tumble dryers. |
-| Reliability | All network errors reported readably; one request at a time per appliance. |
+| Reliability | All network errors reported readably; one request at a time per appliance. A command the appliance acknowledges but refuses (a `Failure` entry) is reported as an error instead of looking successful. |
 | Code | Typed `entry.runtime_data`, shared error mapping, unused imports removed. |
-| Maintenance | release-please releases, CI (Python 3.14 / HA 2026.11), HACS + hassfest validation, daily security audit (pip-audit, OSV-Scanner, Gitleaks, dependency review), Dependabot. |
+| Maintenance | Weekly *Upstream changes to review* issue listing upstream commits not taken yet (skipped ones in `.github/upstream-ignore.txt`), release-please releases, CI (Python 3.14 / HA 2026.11), HACS + hassfest validation, daily security audit (pip-audit, OSV-Scanner, Gitleaks, dependency review), Dependabot. |
 
 Releases follow conventional commits: `feat:`, `fix:` and `perf:` release; `chore:`, `ci:`, `docs:` and `test:` do not.
 
