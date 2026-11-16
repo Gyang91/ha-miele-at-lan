@@ -4,3 +4,37 @@
 #
 # One full 40-character SHA per line, then the reason, for example:
 # 0123456789abcdef0123456789abcdef01234567 duplicate of fork 8fc8644
+
+# Upstream release commits: version bumps clash with this fork's release-please.
+963ea1a7379e95591c2171304fd9e3bbf6fa05a2 release v1.17.2
+1fdbd5f46a56bf39f8e071b25877715a65070308 release v1.18.0
+22a4483b8e6303b7253da0d3b1f80632380bb198 release v1.19.0
+9fcb84c55826a10e8bc7c4b22f91bb7bb40d9730 release v1.19.1
+80be689990968701ff75bacb1854602c8c86d850 release v1.20.0
+2264534c3b8364e1eab3414f0ac437581606e292 release v1.21.0
+e78a52be8566ce2ccc9a05356cce5f91f1f8476b release v1.22.0
+f9a99d363d159951f2820580ef383e5f757a3132 release v1.23.0
+e9d59ef0e3f7f272083574d4b7fb3ac054068eda release v1.24.0
+73176f4d78e851e6962d5fabcf42b530984ccced release v1.24.1
+
+# Upstream README changes: this fork has its own README.
+1508c8e8dc87629563cba3781fafe761328f4b7a README
+b802c1ecaafc0b079db9e2ab82bfb82a8e2f03ae README
+e0f4a690df72d187200e1b79090560d8ce6e3676 README
+f9eeb33385bad9ef1d39e708830c91eb2c08adc1 README
+91aa39f1381f0f6f6977ae7e0e02fa500d142083 README
+9ab06de3f3fa0407d0720cbb1f367b19174b3bae README
+5678bc3ae779ba7d118cde90f7cfd926638af02a README
+
+# Already in the fork in its own form.
+71ba838aa41104ac68e8e1d165b2c250d5157a1e duplicate of fork 8fc8644 (broader)
+7c2bbb837e126e32f36a954351e97231b7d13eda covered by fork 8fc8644
+ce6b830c82565f75491ff678188946c007211d72 duplicate of fork 68b8729 (dishwasher and laundry)
+ce1f9cd6f9d7b2fbd9980637f1fe57ec57f56e0b duplicate of fork b9d0ecc
+7b529725ef8f43dd63cc86fcc1e20bd8a62a7181 duplicate of fork 8a32562 (same smart_grid key)
+8ba79e75d081d42aec006047f52065d7718b5a4f ported by hand as fork 228bcfe
+
+# Not for this fork's appliances.
+f658cfbf015230a2e25f3a6eb8a71aab6e8c1eb2 WMV960/G6992 only; fork program_* sensors cover it
+188621a7cdd8f044b7890047bc2e66361b139c92 H6800BMX oven only
+aea14b6f5dadb800a3373e400ae29f547cf062fb dishwasher programme select
