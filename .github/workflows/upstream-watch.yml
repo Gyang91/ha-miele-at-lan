@@ -1,0 +1,120 @@
+name: Upstream watch
+
+# Weekly list of upstream commits (tiehfood/ha-miele-at-lan main) that are
+# not in this fork yet, kept in ONE issue titled "Upstream changes to review".
+# The fork cherry-picks (git cherry-pick -x) instead of merging, so a commit
+# counts as taken when the default branch has a commit with the same patch-id
+# (git cherry) or a "(cherry picked from commit <sha>)" trailer naming it.
+# Commits decided against are listed in .github/upstream-ignore.txt.
+# The issue is closed when nothing is pending. This workflow only reports: it
+# never merges or cherry-picks anything.
+on:
+  schedule:
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+  # Test changes to the watcher itself on their pull request.
+  pull_request:
+    paths:
+      - .github/workflows/upstream-watch.yml
+      - .github/upstream-ignore.txt
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: upstream-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    name: List pending upstream commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Pull requests from forks get a read-only token and cannot edit issues.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Fetch upstream
+        env:
+          UPSTREAM: tiehfood/ha-miele-at-lan
+        run: |
+          git remote add upstream "https://github.com/$UPSTREAM.git"
+          git fetch --no-tags upstream main
+
+      - name: List commits not yet in the fork
+        env:
+          UPSTREAM_URL: https://github.com/tiehfood/ha-miele-at-lan
+          FORK: origin/${{ github.event.repository.default_branch }}
+        run: |
+          # Upstream commits already taken by an edited cherry-pick (the
+          # patch-id differs when a conflict was resolved) or decided against.
+          {
+            git log "$FORK" --format=%B |
+              sed -n 's/.*(cherry picked from commit \([0-9a-f]\{40\}\)).*/\1/p'
+            if [ -f .github/upstream-ignore.txt ]; then
+              grep -oE '^[0-9a-f]{40}' .github/upstream-ignore.txt || true
+            fi
+          } | sort -u >taken.txt
+
+          # "+" = no commit with the same patch-id on the fork; oldest first.
+          git cherry "$FORK" upstream/main | sed -n 's/^+ //p' >unmatched.txt
+          : >pending.md
+          while read -r sha; do
+            grep -qx "$sha" taken.txt && continue
+            # Skip merge commits: their changes are listed through their parents.
+            [ "$(git rev-list --no-walk --count --min-parents=2 "$sha")" = 0 ] || continue
+            git show -s --format="- [\`%h\`]($UPSTREAM_URL/commit/%H) %as %s" "$sha" >>pending.md
+          done <unmatched.txt
+          echo "$(wc -l <pending.md) pending upstream commit(s)"
+          cat pending.md
+
+      - name: Open, update or close the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TITLE: Upstream changes to review
+          UPSTREAM_URL: https://github.com/tiehfood/ha-miele-at-lan
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # The most recent issue with this exact title, open or closed.
+          ISSUE_JSON=$(gh issue list --state all --limit 1000 --json number,state,title,body \
+            --jq "[.[] | select(.title == \"$TITLE\")] | sort_by(-.number) | first // empty")
+          NUMBER=$(jq -r '.number // empty' <<<"$ISSUE_JSON")
+          STATE=$(jq -r '.state // empty' <<<"$ISSUE_JSON")
+
+          if [ ! -s pending.md ]; then
+            if [ "$STATE" = OPEN ]; then
+              gh issue close "$NUMBER" --comment "Nothing pending from upstream ($RUN_URL)."
+            fi
+            echo "Nothing pending"
+            exit 0
+          fi
+
+          {
+            echo "Upstream commits on [\`main\`]($UPSTREAM_URL/commits/main) that are not in this fork yet, oldest first."
+            echo "Review each one and take it with \`git cherry-pick -x <sha>\`, or add its full SHA to \`.github/upstream-ignore.txt\` to stop listing it."
+            echo
+            cat pending.md
+            echo
+            echo "_Updated by the [Upstream watch]($RUN_URL) workflow._"
+          } >body.md
+
+          if [ -z "$NUMBER" ]; then
+            gh issue create --title "$TITLE" --body-file body.md
+            exit 0
+          fi
+          if [ "$STATE" = CLOSED ]; then
+            gh issue reopen "$NUMBER"
+          fi
+          # Ignore the run link when comparing, so an unchanged list stays quiet.
+          if [ "$(grep -v '_Updated by' body.md)" != "$(jq -r .body <<<"$ISSUE_JSON" | tr -d '\r' | grep -v '_Updated by')" ]; then
+            gh issue edit "$NUMBER" --body-file body.md
+          else
+            echo "Issue #$NUMBER is up to date"
+          fi

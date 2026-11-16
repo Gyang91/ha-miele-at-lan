@@ -1,0 +1,6 @@
+# Upstream commits (tiehfood/ha-miele-at-lan) this fork has decided not to
+# take. The Upstream watch workflow stops listing them in the
+# "Upstream changes to review" issue.
+#
+# One full 40-character SHA per line, then the reason, for example:
+# 0123456789abcdef0123456789abcdef01234567 duplicate of fork 8fc8644
