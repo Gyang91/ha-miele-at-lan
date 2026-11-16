@@ -53,19 +53,35 @@ Diagnostic entities (raw enums, WLAN info, push state, firmware version) are cre
 
 Read-only **Extractor speed** sensor (Off, 1–3, Boost) and read-only **Extractor** fan entity (0 / 25 / 50 / 75 / 100 %, 100 % = Boost). Discrete steps, not measured airflow. No fan control.
 
+<!-- ha-marketplace:exclude-start -->
 ## Installation
 
-### HACS
+### Marketplace (Home Assistant 2026.11 and newer)
+
+The Marketplace replaced HACS in Home Assistant 2026.11. An install made with HACS before the upgrade moved to the Marketplace automatically.
+
+[![Open Marketplace repository on My Home Assistant](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=Gyang91&repository=ha-miele-at-lan&category=integration)
+
+Or: **Settings → Marketplace → Add from link** → `https://github.com/Gyang91/ha-miele-at-lan`, type **Integration** → **Install**. The first time, accept the notice "Before you install from the Marketplace"; adding from a link needs a GitHub connection, which Home Assistant asks for.
+
+### HACS (Home Assistant 2026.10 and older)
 
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Gyang91&repository=ha-miele-at-lan&category=integration)
 
 Or: HACS → ⋮ → Custom repositories → `https://github.com/Gyang91/ha-miele-at-lan`, type **Integration** → download → restart HA.
 
-Switching from the original repository: remove `tiehfood/ha-miele-at-lan` in HACS, add this one, download, restart. Config entries, devices and entity IDs are kept.
+### Switching from the original repository
+
+Remove `tiehfood/ha-miele-at-lan` in the Marketplace (or HACS), add this one, install, restart. Config entries, devices and entity IDs are kept.
+
+### Updating
+
+New releases show up like any other Home Assistant update. Install it, then restart Home Assistant when asked.
 
 ### Manual
 
 Copy `custom_components/miele_lan/` to `<config>/custom_components/miele_lan/` and restart.
+<!-- ha-marketplace:exclude-end -->
 
 ### Adding your household
 
