@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.1](https://github.com/Gyang91/ha-miele-at-lan/compare/v1.21.0...v1.21.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* **api:** Report /State writes the appliance rejects with a Failure entry ([0fc43c9](https://github.com/Gyang91/ha-miele-at-lan/commit/0fc43c909b506d70de01ca8011604d6df55b4a81))
+
 ## [1.21.0](https://github.com/Gyang91/ha-miele-at-lan/compare/v1.20.1...v1.21.0) (2026-11-16)
 
 
