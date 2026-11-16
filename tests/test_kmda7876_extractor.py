@@ -61,6 +61,7 @@ def _entry(coord):
     return SimpleNamespace(
         entry_id="test",
         runtime_data=MieleLanRuntimeData(coordinators={coord.fab: coord}),
+        async_on_unload=lambda unsub: None,
     )
 
 
