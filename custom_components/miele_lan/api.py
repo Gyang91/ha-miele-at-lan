@@ -529,6 +529,43 @@ def _install_patches() -> None:
     _client_mod.MieleClient._request_bytes = _patched_request_bytes  # type: ignore[assignment]
 
 
+class ActionRejectedError(HomeAssistantError):
+    """A /State write was acknowledged with HTTP 200 but carried a `Failure` entry.
+
+    The appliance understood the request and refused it, so this is not a
+    connection problem. Callers that only wake the appliance can carry on.
+    """
+
+
+def _raise_on_failure(raw: bytes) -> None:
+    """Raise when a /State write answered HTTP 200 with a `Failure` entry.
+
+    The appliance acknowledges a field it does not have as
+    ``[{"Failure":{"DeviceAction":null}}]`` with a 200 status, so the status
+    alone says nothing about whether the command was carried out.
+    """
+    text = raw.decode("utf-8", errors="replace").strip() if raw else ""
+    if not text:
+        return
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return
+    items = parsed if isinstance(parsed, list) else [parsed]
+    failed: list[str] = []
+    for item in items:
+        failure = item.get("Failure") if isinstance(item, dict) else None
+        if isinstance(failure, dict):
+            failed.extend(str(key) for key in failure)
+        elif failure:
+            failed.append(str(failure))
+    if failed:
+        raise ActionRejectedError(
+            "The appliance does not support this action "
+            f"({', '.join(failed)} was rejected)."
+        )
+
+
 class MieleLanClient:
     """High-level local client for one provisioned Miele appliance.
 
@@ -618,6 +655,7 @@ class MieleLanClient:
                 ) from exc
         if status == 204 or not raw:
             return {}
+        _raise_on_failure(raw)
         text = raw.decode("utf-8", errors="replace").strip()
         try:
             parsed = json.loads(text)
@@ -671,7 +709,7 @@ class MieleLanClient:
                 raise HomeAssistantError(reason)
         with _command_transport_errors():
             try:
-                await self._client._request_bytes(
+                _, raw = await self._client._request_bytes(
                     "PUT",
                     f"/Devices/{self._route}/State",
                     body={"ProcessAction": action},
@@ -681,6 +719,7 @@ class MieleLanClient:
                 raise HomeAssistantError(
                     f"The appliance refused this command (HTTP {exc.status_code})."
                 ) from exc
+        _raise_on_failure(raw)
 
     async def start_process(
         self,
