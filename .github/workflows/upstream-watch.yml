@@ -50,7 +50,9 @@ jobs:
       - name: List commits not yet in the fork
         env:
           UPSTREAM_URL: https://github.com/tiehfood/ha-miele-at-lan
-          FORK: origin/${{ github.event.repository.default_branch }}
+          # Not github.event.repository.default_branch: scheduled runs have
+          # no repository in their event payload.
+          FORK: origin/main
         run: |
           # Upstream commits already taken by an edited cherry-pick (the
           # patch-id differs when a conflict was resolved) or decided against.
