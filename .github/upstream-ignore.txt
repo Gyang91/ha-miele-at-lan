@@ -38,3 +38,8 @@ ce1f9cd6f9d7b2fbd9980637f1fe57ec57f56e0b duplicate of fork b9d0ecc
 f658cfbf015230a2e25f3a6eb8a71aab6e8c1eb2 WMV960/G6992 only; fork program_* sensors cover it
 188621a7cdd8f044b7890047bc2e66361b139c92 H6800BMX oven only
 aea14b6f5dadb800a3373e400ae29f547cf062fb dishwasher programme select
+
+# Reviewed 2026-11-16.
+813586e23039624cd08fbd728c5e673f67f82a4c duplicate of fork 99bf9ae (push keeps the poll schedule)
+849e65bbc8930c5bb032c56c0be1cf07bd0a13e0 rejected /State writes ported as fork ad9d366; oven DOP2 stop fallback not needed
+9008f56c958220ba1f2a51873f404d3cb49247f7 refactor of the DOP2 write path, no behaviour change
