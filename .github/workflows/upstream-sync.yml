@@ -1,0 +1,148 @@
+name: Upstream sync
+
+# Weekly, before the Upstream watch: take the upstream commits
+# (tiehfood/ha-miele-at-lan main) that apply cleanly, test them, and merge
+# them through a pull request. Everything that conflicts stays in the
+# "Upstream changes to review" issue for a manual port.
+# - What is picked and left out: see .github/scripts/upstream-pick.sh.
+# - The picks go to the upstream-sync branch and one pull request labelled
+#   upstream-sync. When the tests pass, the pull request is merged (rebase, so
+#   each commit reaches the changelog) and Release, CI, Validate and Upstream
+#   watch are started. When they fail, the pull request stays open and the
+#   run fails, so the change gets a manual look.
+# - A manual run with merge=false only opens the pull request.
+on:
+  schedule:
+    - cron: "30 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      merge:
+        description: Merge the pull request when the tests pass
+        type: boolean
+        default: true
+
+permissions:
+  actions: write # start Release, CI, Validate and Upstream watch
+  contents: write
+  pull-requests: write
+  issues: write # create the upstream-sync label
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+env:
+  UPSTREAM: tiehfood/ha-miele-at-lan
+  UPSTREAM_URL: https://github.com/tiehfood/ha-miele-at-lan
+  BRANCH: upstream-sync
+
+jobs:
+  sync:
+    name: Pick, test and merge upstream commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Pick the upstream commits that apply cleanly
+        id: pick
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream "https://github.com/$UPSTREAM.git"
+          git fetch --no-tags upstream main
+          git switch -C "$BRANCH" origin/main
+          bash .github/scripts/upstream-pick.sh origin/main upstream/main "$UPSTREAM_URL"
+          echo "picked=$(wc -l <picked.md)" >>"$GITHUB_OUTPUT"
+          echo "commits=$(git rev-list --count origin/main..HEAD)" >>"$GITHUB_OUTPUT"
+          echo "Picked:"; cat picked.md
+          echo "Skipped:"; cat skipped.md
+
+      - uses: actions/setup-python@v7
+        if: steps.pick.outputs.picked != '0'
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements_test.txt
+
+      - name: Test the picks
+        id: tests
+        if: steps.pick.outputs.picked != '0'
+        continue-on-error: true
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements_test.txt
+          python -m compileall -q custom_components
+          pytest tests/ -q
+
+      - name: Open or update the pull request
+        id: pr
+        if: steps.pick.outputs.commits != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TESTS: ${{ steps.tests.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          git push --force origin "$BRANCH"
+          {
+            echo "Upstream commits that applied cleanly, cherry-picked with \`-x\`, oldest first."
+            echo
+            if [ -s picked.md ]; then cat picked.md; else echo "None: only the ignore list changed."; fi
+            if [ -s skipped.md ]; then
+              echo
+              echo "**Not picked**: these stay in the \"Upstream changes to review\" issue for a manual port."
+              echo
+              cat skipped.md
+            fi
+            echo
+            case "$TESTS" in
+              success) echo "Tests passed." ;;
+              failure) echo "**Tests failed**: not merged automatically. See the [run]($RUN_URL)." ;;
+              *) echo "No code picked, so no tests ran." ;;
+            esac
+            echo
+            echo "_Opened by the [Upstream sync]($RUN_URL) workflow._"
+          } >body.md
+
+          gh label create upstream-sync --color 0E8A16 \
+            --description "Opened by the Upstream sync workflow" 2>/dev/null || true
+          PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -z "$PR" ]; then
+            gh pr create --base main --head "$BRANCH" --label upstream-sync \
+              --title "Take upstream commits that apply cleanly" --body-file body.md
+            PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+          else
+            gh pr edit "$PR" --body-file body.md
+          fi
+          echo "number=$PR" >>"$GITHUB_OUTPUT"
+
+      - name: Merge and start the follow-up workflows
+        if: >-
+          steps.pr.outputs.number &&
+          steps.tests.outcome != 'failure' &&
+          (github.event_name == 'schedule' || inputs.merge)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          if gh pr view "$PR" --json labels --jq '.labels[].name' | grep -qx no-automerge; then
+            echo "#$PR is labelled no-automerge: not merged automatically"
+            exit 0
+          fi
+          gh pr merge "$PR" --rebase --match-head-commit "$(git rev-parse HEAD)" --delete-branch
+          # A merge made with GITHUB_TOKEN starts no push workflows.
+          gh workflow run release.yml --ref main
+          gh workflow run ci.yml --ref main
+          gh workflow run validate.yml --ref main
+          gh workflow run upstream-watch.yml --ref main
+
+      - name: Fail the run when the tests failed
+        if: steps.tests.outcome == 'failure'
+        run: |
+          echo "::error::The picked upstream commits fail the tests; the pull request stays open."
+          exit 1
