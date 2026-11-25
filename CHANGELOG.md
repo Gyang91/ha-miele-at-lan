@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.21.2](https://github.com/Gyang91/ha-miele-at-lan/compare/v1.21.1...v1.21.2) (2026-11-25)
+
+
+### Bug Fixes
+
+* **binary_sensor:** Ignore the dishwasher's 2/1585 door state while it is off ([092068a](https://github.com/Gyang91/ha-miele-at-lan/commit/092068aa3b973ad4299a57efa8c3591eee5fbd2f))
+* **cloud:** Import asyncio for the OIDC endpoint lookup ([149ab9a](https://github.com/Gyang91/ha-miele-at-lan/commit/149ab9aa0ad958039db6df06437b3bdcca87e7e1))
+* **cloud:** Use the sales company's own login endpoint where it is not on the MAP gateway ([710185c](https://github.com/Gyang91/ha-miele-at-lan/commit/710185ce999a8d15023f4e70ac53ee5018437780))
+* **enrollment:** Retry the signed appliance probe and probe discovered appliances concurrently ([eacfb52](https://github.com/Gyang91/ha-miele-at-lan/commit/eacfb52b0991d9ba30babb440773e39fd7a792d0))
+* **sensor:** Hold the finish time through a one-minute wobble ([08ed6c9](https://github.com/Gyang91/ha-miele-at-lan/commit/08ed6c9d7c125b6bba9196c90b33e1e54c7f9715))
+* **tools:** Stop reporting success on HTTP 403 during commissioning ([8b04a36](https://github.com/Gyang91/ha-miele-at-lan/commit/8b04a36eb7950dfdfcb125b40157a8fcc83730ac))
+
 ## [1.21.1](https://github.com/Gyang91/ha-miele-at-lan/compare/v1.21.0...v1.21.1) (2026-11-16)
 
 
