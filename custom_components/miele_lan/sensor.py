@@ -283,6 +283,9 @@ def _progress_percent(state: dict[str, Any]) -> int | None:
     return round(elapsed * 100 / (elapsed + remaining))
 
 
+FINISH_TIME_WOBBLE = _dt.timedelta(minutes=1)
+
+
 def _finish_time(state: dict[str, Any]) -> _dt.datetime | None:
     """now + delayed start + remaining, as the app's laundry EndTime (WMV960.cs:5177).
 
@@ -1212,6 +1215,8 @@ async def async_setup_entry(
                 entities.append(MieleLanProgramSensor(coord, d.description))
             elif key in ("program_id_raw", "program_phase_raw"):
                 entities.append(MieleLanProgramRawSensor(coord, d.description))
+            elif key == "finish_time":
+                entities.append(MieleLanFinishTimeSensor(coord, d.description))
             else:
                 entities.append(MieleLanSensor(coord, d.description))
         if dt in CYCLE_FAMILY:
@@ -1330,6 +1335,33 @@ class MieleLanProgramTimeSensor(MieleLanEntity, SensorEntity):
             return self._last
         self._last = stabilise(self._last, value)
         return self._last
+
+
+class MieleLanFinishTimeSensor(MieleLanSensor):
+    """Finish time that holds through a one-minute wobble.
+
+    RemainingTime is in whole minutes and the appliance counts it down out of
+    step with the clock, so now + remaining alternates between two adjacent
+    minutes for most of a programme (upstream issue #76). A larger change, such as a new
+    programme or delayed start, comes through on the next update.
+    """
+
+    def __init__(
+        self, coordinator: MieleLanCoordinator, description: MieleLanSensorDescription
+    ) -> None:
+        super().__init__(coordinator, description)
+        self._last_value: _dt.datetime | None = None
+
+    @property
+    def native_value(self) -> Any:
+        value = super().native_value
+        if (
+            value is None
+            or self._last_value is None
+            or abs(value - self._last_value) > FINISH_TIME_WOBBLE
+        ):
+            self._last_value = value
+        return self._last_value
 
 
 class MieleLanProgramSensor(MieleLanEntity, SensorEntity):
