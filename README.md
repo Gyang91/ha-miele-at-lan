@@ -232,7 +232,7 @@ Parser and protocol tests need no running Home Assistant.
 
 ## Fork changes
 
-Differences from upstream [tiehfood/ha-miele-at-lan](https://github.com/tiehfood/ha-miele-at-lan). The fork branched at v1.17.1 and takes upstream changes by cherry-pick, not merge; the upstream fixes that apply to this fork, up to v1.24.1, are included.
+Differences from upstream [tiehfood/ha-miele-at-lan](https://github.com/tiehfood/ha-miele-at-lan). The fork branched at v1.17.1 and takes upstream changes by cherry-pick, not merge; the upstream fixes that apply to this fork, up to v1.28.0, are included.
 
 | Area | Change |
 |---|---|
@@ -243,7 +243,7 @@ Differences from upstream [tiehfood/ha-miele-at-lan](https://github.com/tiehfood
 | New controls | Power switch for tumble dryers. |
 | Reliability | All network errors reported readably; one request at a time per appliance. A command the appliance acknowledges but refuses (a `Failure` entry) is reported as an error instead of looking successful. |
 | Code | Typed `entry.runtime_data`, shared error mapping, unused imports removed. |
-| Maintenance | Weekly *Upstream changes to review* issue listing upstream commits not taken yet (skipped ones in `.github/upstream-ignore.txt`), release-please releases, CI (Python 3.14 / HA 2026.11), HACS + hassfest validation, daily security audit (pip-audit, OSV-Scanner, Gitleaks, dependency review), Dependabot. |
+| Maintenance | Weekly upstream sync: upstream commits that apply cleanly are cherry-picked, tested and merged through a pull request; the rest is listed in the *Upstream changes to review* issue for a manual port (skipped ones in `.github/upstream-ignore.txt`), release-please releases, CI (Python 3.14 / HA 2026.11), HACS + hassfest validation, daily security audit (pip-audit, OSV-Scanner, Gitleaks, dependency review), Dependabot. |
 
 Releases follow conventional commits: `feat:`, `fix:` and `perf:` release; `chore:`, `ci:`, `docs:` and `test:` do not.
 
