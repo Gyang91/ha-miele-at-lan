@@ -43,3 +43,18 @@ aea14b6f5dadb800a3373e400ae29f547cf062fb dishwasher programme select
 813586e23039624cd08fbd728c5e673f67f82a4c duplicate of fork 99bf9ae (push keeps the poll schedule)
 849e65bbc8930c5bb032c56c0be1cf07bd0a13e0 rejected /State writes ported as fork ad9d366; oven DOP2 stop fallback not needed
 9008f56c958220ba1f2a51873f404d3cb49247f7 refactor of the DOP2 write path, no behaviour change
+
+# Reviewed 2026-11-25.
+2202acab3fa234b2addb12a14845f555fc9dd936 release v1.24.2
+b57e9ac928454b3cceb264d1ad056e3692be96e8 release v1.24.3
+09cc99c2f6be4cc6d1da7a7e52bf63b5db4624cf release v1.25.0
+90feda8249f2c6774665bf69fd51c093486a33d8 release v1.25.1
+07949a5616b89af948f24b3aae2866e4d7bfd777 release v1.26.0
+2541450d444f7022e272d8954c5141d44de7ba77 release v1.27.0
+48643949cf3687fefc1e9a97b441fd47d22b97f6 release v1.27.1
+5b77e71c429c0eda21e599f1aa0da886716c9358 release v1.27.2
+c919a25ffc28ee4590826366fa61b47d8b83a6fa release v1.28.0
+07f3553983af514f21c8fd6c1f409cb2fa55e5b8 washer lifetime totals: fork _consumption_counter covers the laundry family via field 1
+e7e3bd83d5212c58e08a42bfff14e56aa4c050b7 dryer lifetime totals: same, fork reads field 1 instead of IntType
+9b61dffbfc1f3643c86ed96ec65f4fe466e0e145 dump REST resource index: debug only, not needed
+04b4b4fd0072ec47cab87f5fb1f7dfa2f20852db dump REST resource free path: debug only, not needed
