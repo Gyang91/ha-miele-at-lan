@@ -10,6 +10,7 @@ provisioning, preserving cloud pairing so the Miele app keeps working.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import logging
